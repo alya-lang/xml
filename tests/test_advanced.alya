@@ -90,3 +90,5 @@ function test_namespaces(r)
     runner_assert_eq(r, len(inner), 1, "inner scope match count")
     runner_assert_str_eq(r, inner[0].text, "i", "inner redeclaration wins inside")
 end
+
+main()

@@ -58,6 +58,7 @@ pub function escape_attr(s: string) -> string
         let e = when ch
             is "&" => "&amp;"
             is "<" => "&lt;"
+            is ">" => "&gt;"
             is "\"" => "&quot;"
             is "\t" => "&#9;"
             is "\n" => "&#10;"
@@ -115,6 +116,16 @@ function indent_pad(level: int) -> string
     return res
 end
 
+## Reads one attribute value through a call boundary.
+##
+## Direct inline indexing (`node.attrs[key]`) inside attribute loops
+## miscompiles to array indexing on some paths; routing the same read
+## through this helper keeps map dispatch. Remove if the compiler fixes
+## inline struct-field map reads with computed keys.
+function attr_lookup(node, key: string) -> string
+    return node.attrs[key]
+end
+
 ## Renders an attribute map to ` key="value"` fragments.
 ##
 ## Attributes listed in the node's `attr_order` render first in document
@@ -135,7 +146,7 @@ function render_attrs(node) -> string
     if node.attr_order is not null
         for aname in node.attr_order
             if _map_has(node.attrs, aname) == 1
-                let aval = escape_attr(node.attrs[aname])
+                let aval = escape_attr(attr_lookup(node, aname))
                 res += " {aname}=\"{aval}\""
                 seen[aname] = 1
             end
@@ -144,7 +155,7 @@ function render_attrs(node) -> string
     let names = keys(node.attrs)
     for aname in names
         if _map_has(seen, aname) == 0
-            let aval = escape_attr(node.attrs[aname])
+            let aval = escape_attr(attr_lookup(node, aname))
             res += " {aname}=\"{aval}\""
         end
     end
@@ -210,6 +221,10 @@ function render_node(node, pretty: int, level: int) -> string
 end
 
 ## Serializes a node tree to an XML string.
+##
+## Element text is concatenated across children at parse time and renders
+## before child elements (document order inside mixed content is not
+## preserved by design).
 ##
 ## ### Parameters
 ## - `node`: Root `XmlNode` (null yields `""`).

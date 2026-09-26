@@ -204,12 +204,16 @@ pub function first_child(node, name: string)
     if node is null or node.children is null
         return null
     end
+    # NOTE: do not `return kid` directly here: returning an array element
+    # from inside a loop yields a stale pointer, so collect then return.
+    let found = null
     for kid in node.children
         if kid.name == name
-            return kid
+            found = kid
+            break
         end
     end
-    return null
+    return found
 end
 
 ## Returns node text content or a default when empty.
