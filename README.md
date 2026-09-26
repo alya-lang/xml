@@ -20,7 +20,7 @@ A fast, zero-dependency XML 1.0 parser and serializer for the Alya Programming L
   - **References**: Predefined entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`) plus decimal (`&#65;`) and hexadecimal (`&#x41;`) character references; unknown entities pass through literally.
   - **Path Navigation**: Dot-separated element queries (`catalog.book.title`), recursive `find_all`, and trimmed text helpers.
 - 🛠️ **Builder API**: Programmatically construct documents (`make_element`, `set_attr`, `add_child`, `set_text`) and serialize compact or pretty-printed.
-- 🧪 **100% Verified**: 118 assertions passing, verified on Windows (Linux/macOS via CI).
+- 🧪 **100% Verified**: 126 assertions passing, verified on Windows (Linux/macOS via CI).
 
 ---
 
@@ -37,7 +37,8 @@ xml/
 ├── examples/
 │   └── demo.alya           # Comprehensive usage example
 ├── tests/
-│   └── test_basic.alya     # Full 14-part automated test suite (118 assertions)
+│   ├── test_basic.alya     # Full 14-part automated test suite (118 assertions)
+│   └── test_unicode.alya   # Unicode reference regression suite (8 assertions)
 └── benches/
     └── bench_basic.alya    # Micro-benchmarks for parsing, lookup, and serialization
 ```

@@ -193,6 +193,30 @@ function parse_hex_code(s: string) -> int
     return res
 end
 
+## Encodes a Unicode codepoint as UTF-8.
+##
+## chr() only covers 0..255 and crashes the host process above that;
+## this helper keeps entity decoding total without touching the compiler.
+## Out-of-range codes yield "" (callers fall back to literal passthrough).
+function chr_utf8(code: int) -> string
+    if code < 0
+        return ""
+    end
+    if code < 128
+        return chr(code)
+    end
+    if code < 2048
+        return chr(192 + code / 64) + chr(128 + code % 64)
+    end
+    if code < 65536
+        return chr(224 + code / 4096) + chr(128 + (code / 64) % 64) + chr(128 + code % 64)
+    end
+    if code < 1114112
+        return chr(240 + code / 262144) + chr(128 + (code / 4096) % 64) + chr(128 + (code / 64) % 64) + chr(128 + code % 64)
+    end
+    return ""
+end
+
 ## Parses an entity or character reference at the given position.
 ##
 ## Handles `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, decimal
@@ -247,7 +271,10 @@ pub function parse_entity(text: string, pos: int, text_len: int)
         if char_at(ename, 1) == "x" or char_at(ename, 1) == "X"
             if elen > 2
                 let hexpart = substring(ename, 2, elen - 2)
-                return chr(parse_hex_code(hexpart)), end_pos
+                let hexcode = parse_hex_code(hexpart)
+                if hexcode <= 1114111
+                    return chr_utf8(hexcode), end_pos
+                end
             end
         else
             let digits = substring(ename, 1, elen - 1)
@@ -262,7 +289,10 @@ pub function parse_entity(text: string, pos: int, text_len: int)
                 di += 1
             end
             if all_digits == 1 and dlen > 0
-                return chr(to_int(digits)), end_pos
+                let dcode = to_int(digits)
+                if dcode <= 1114111
+                    return chr_utf8(dcode), end_pos
+                end
             end
         end
     end

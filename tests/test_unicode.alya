@@ -1,0 +1,44 @@
+## Unicode regression tests for the xml library
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+##
+## Non-Latin1 character references must decode to UTF-8. Previously any
+## codepoint above 255 crashed the host process inside chr().
+
+import "std/test"
+import "../src/lib.alya" as xml
+
+function main()
+    test_suite("Alya XML Unicode Regression Suite")
+    let r = runner_new()
+
+    let latin = xml::parse("<a>&#65;</a>")
+    runner_assert_str_eq(r, latin.text, "A", "decimal Latin-1 reference")
+
+    let e9 = xml::parse("<a>&#233;</a>")
+    runner_assert_str_eq(r, e9.text, "é", "decimal reference above Latin-1")
+
+    let euro_dec = xml::parse("<a>&#8364;</a>")
+    runner_assert_str_eq(r, euro_dec.text, "€", "decimal euro reference")
+
+    let euro_hex = xml::parse("<a>&#x20AC;</a>")
+    runner_assert_str_eq(r, euro_hex.text, "€", "hex euro reference")
+
+    let grin = xml::parse("<a>&#x1F600;</a>")
+    runner_assert_str_eq(r, grin.text, "😀", "astral hex reference")
+
+    let big = xml::parse("<a>&#x110000;</a>")
+    runner_assert_str_eq(r, big.text, "&#x110000;", "out-of-range reference passes through")
+
+    let attr = xml::parse("<a title=\"&#8364;100\">x</a>")
+    runner_assert_str_eq(r, xml::get_attr(attr, "title"), "€100", "reference in attribute value")
+
+    let rt = xml::stringify(xml::parse("<a>€</a>"))
+    runner_assert_str_eq(r, rt, "<a>€</a>", "multi-byte round-trip")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()
