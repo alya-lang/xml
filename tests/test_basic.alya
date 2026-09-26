@@ -288,4 +288,13 @@ function test_edge_cases(r)
     let spaced = xml::parse("  <a>  padded  </a>  ")
     runner_assert_str_eq(r, spaced.name, "a", "surrounding whitespace tolerated")
     runner_assert_str_eq(r, trim(spaced.text), "padded", "padded text trims cleanly")
+
+    let bom_doc = xml::parse("﻿<a>x</a>")
+    runner_assert(r, bom_doc is not null, "BOM-led document parses")
+    runner_assert_str_eq(r, bom_doc.name, "a", "BOM-led root name")
+    runner_assert_str_eq(r, bom_doc.text, "x", "BOM-led root text")
+
+    let not_decl = xml::parse_doc("<?xmlfoo?><a>x</a>")
+    runner_assert_str_eq(r, not_decl.version, "1.0", "xmlfoo PI keeps default version")
+    runner_assert_str_eq(r, not_decl.root.name, "a", "xmlfoo PI skipped as processing instruction")
 end

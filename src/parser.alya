@@ -355,6 +355,57 @@ pub function parse_cdata(text: string, pos: int, text_len: int)
     return substring(text, start, pos - start), pos
 end
 
+## Skips a leading UTF-8 byte-order mark (EF BB BF) if present.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `text_len`: Total text length.
+##
+## ### Returns
+## `3` when a BOM leads the input, `0` otherwise.
+pub function skip_bom(text: string, text_len: int) -> int
+    if text_len >= 3 and ord(char_at(text, 0)) == 239 and ord(char_at(text, 1)) == 187 and ord(char_at(text, 2)) == 191
+        return 3
+    end
+    return 0
+end
+
+## Decodes entity and character references inside a plain string.
+##
+## Applies the same rules as text content: predefined entities,
+## decimal and hexadecimal references decode, unknown entities pass
+## through literally.
+##
+## ### Parameters
+## - `s`: Source string (null yields `""`).
+##
+## ### Returns
+## The decoded string.
+##
+## ### Examples
+## ```alya
+## let t = unescape("a &amp; b") # "a & b"
+## ```
+pub function unescape(s: string) -> string
+    if s is null
+        return ""
+    end
+    let slen = len(s)
+    let res = ""
+    let i = 0
+    while i < slen
+        if char_at(s, i) == "&"
+            let ev, evpos = parse_entity(s, i, slen)
+            res += ev
+            i = evpos
+        else
+            res += char_at(s, i)
+            i += 1
+        end
+    end
+    return res
+end
+
 ## Parses one element (open tag, content, close tag) at the given position.
 ##
 ## ### Parameters
@@ -517,7 +568,7 @@ end
 ## ```
 pub function parse_xml(text: string)
     let text_len = len(text)
-    let pos = skip_misc(text, 0, text_len)
+    let pos = skip_misc(text, skip_bom(text, text_len), text_len)
     if pos >= text_len
         return null
     end
@@ -546,22 +597,25 @@ end
 ## The parsed `XmlDoc` instance.
 pub function parse_xml_doc(text: string) -> XmlDoc
     let text_len = len(text)
-    let pos = skip_ws(text, 0, text_len)
+    let pos = skip_ws(text, skip_bom(text, text_len), text_len)
     let version = "1.0"
     let encoding = "UTF-8"
     if pos + 5 < text_len and substring(text, pos, 5) == "<?xml"
-        let q = pos + 5
-        while q < text_len
-            if q + 1 < text_len and substring(text, q, 2) == "?>"
-                q += 2
-                break
+        let dch = char_at(text, pos + 5)
+        if is_whitespace(dch) == 1 or dch == "?"
+            let q = pos + 5
+            while q < text_len
+                if q + 1 < text_len and substring(text, q, 2) == "?>"
+                    q += 2
+                    break
+                end
+                q += 1
             end
-            q += 1
+            let decl_body = substring(text, pos, q - pos)
+            version = decl_attr(decl_body, "version", "1.0")
+            encoding = decl_attr(decl_body, "encoding", "UTF-8")
+            pos = q
         end
-        let decl_body = substring(text, pos, q - pos)
-        version = decl_attr(decl_body, "version", "1.0")
-        encoding = decl_attr(decl_body, "encoding", "UTF-8")
-        pos = q
     end
     pos = skip_misc(text, pos, text_len)
     if pos >= text_len

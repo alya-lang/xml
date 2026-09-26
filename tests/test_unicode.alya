@@ -35,6 +35,11 @@ function main()
     let rt = xml::stringify(xml::parse("<a>€</a>"))
     runner_assert_str_eq(r, rt, "<a>€</a>", "multi-byte round-trip")
 
+    runner_assert_str_eq(r, xml::unescape("a &amp; b"), "a & b", "unescape predefined entity")
+    runner_assert_str_eq(r, xml::unescape("&#8364;&#x41;&foo;"), "€A&foo;", "unescape mixed references")
+    runner_assert_str_eq(r, xml::unescape("plain"), "plain", "unescape passes plain text through")
+    runner_assert_str_eq(r, xml::unescape(null), "", "unescape null yields empty")
+
     let failed = runner_summary(r)
     if failed > 0
         exit(1)
