@@ -1,0 +1,548 @@
+## # xml/parser
+##
+## XML 1.0 document parser.
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+##
+## Parses declarations, comments, processing instructions, DOCTYPE blocks,
+## CDATA sections, entity and character references, attributes, and nested
+## elements into `XmlNode` trees. Malformed closers are tolerated leniently
+## (the innermost open element is closed); use `is_valid_name` from the
+## serializer to validate tag names when strictness is required.
+
+import "./types.alya"
+
+## Advances past XML whitespace (space, tab, CR, LF).
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Starting position.
+## - `text_len`: Total text length.
+##
+## ### Returns
+## The first non-whitespace position.
+pub function skip_ws(text: string, pos: int, text_len: int) -> int
+    while pos < text_len
+        if is_whitespace(char_at(text, pos)) == 1
+            pos += 1
+        else
+            break
+        end
+    end
+    return pos
+end
+
+## Skips a `<!-- ... -->` comment, returning the position past `-->`.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of `<` (the `<!--` opener must be verified by the caller).
+## - `text_len`: Total text length.
+##
+## ### Returns
+## The position past the comment (or end of input when unterminated).
+pub function skip_comment(text: string, pos: int, text_len: int) -> int
+    pos += 4
+    while pos < text_len
+        if pos + 2 < text_len and substring(text, pos, 3) == "-->"
+            return pos + 3
+        end
+        pos += 1
+    end
+    return pos
+end
+
+## Skips a `<? ... ?>` processing instruction.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of `<` (the `<?` opener must be verified by the caller).
+## - `text_len`: Total text length.
+##
+## ### Returns
+## The position past `?>` (or end of input when unterminated).
+pub function skip_pi(text: string, pos: int, text_len: int) -> int
+    pos += 2
+    while pos < text_len
+        if pos + 1 < text_len and substring(text, pos, 2) == "?>"
+            return pos + 2
+        end
+        pos += 1
+    end
+    return pos
+end
+
+## Skips a `<!...>` markup declaration (DOCTYPE, ENTITY, etc.).
+##
+## Tracks `[...]` internal-subset depth and quoted strings so a `>` inside
+## the internal subset does not end the declaration early.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of `<` (the `<!` opener must be verified by the caller).
+## - `text_len`: Total text length.
+##
+## ### Returns
+## The position past the closing `>` (or end of input when unterminated).
+pub function skip_bang(text: string, pos: int, text_len: int) -> int
+    pos += 2
+    let depth = 0
+    let quote = ""
+    while pos < text_len
+        let ch = char_at(text, pos)
+        if quote != ""
+            if ch == quote
+                quote = ""
+            end
+        elif ch == "\"" or ch == "'"
+            quote = ch
+        elif ch == "["
+            depth += 1
+        elif ch == "]"
+            if depth > 0
+                depth -= 1
+            end
+        elif ch == ">" and depth == 0
+            return pos + 1
+        end
+        pos += 1
+    end
+    return pos
+end
+
+## Advances past whitespace and miscellaneous markup.
+##
+## Skips whitespace, comments, processing instructions, and `<!...>`
+## declarations, stopping at text content or an element open/close tag.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Starting position.
+## - `text_len`: Total text length.
+##
+## ### Returns
+## The first significant position.
+pub function skip_misc(text: string, pos: int, text_len: int) -> int
+    while pos < text_len
+        let ch = char_at(text, pos)
+        if is_whitespace(ch) == 1
+            pos += 1
+        elif ch == "<"
+            if pos + 3 < text_len and substring(text, pos, 4) == "<!--"
+                pos = skip_comment(text, pos, text_len)
+            elif pos + 1 < text_len and substring(text, pos, 2) == "<?"
+                pos = skip_pi(text, pos, text_len)
+            elif pos + 1 < text_len and substring(text, pos, 2) == "<!"
+                pos = skip_bang(text, pos, text_len)
+            else
+                break
+            end
+        else
+            break
+        end
+    end
+    return pos
+end
+
+## Parses an XML name (`NameStartChar NameChar*`) at the given position.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Starting position.
+## - `text_len`: Total text length.
+##
+## ### Returns
+## A `(name, end_pos)` tuple (empty name when no name character follows).
+pub function parse_name(text: string, pos: int, text_len: int)
+    let start = pos
+    while pos < text_len
+        if is_name_char(char_at(text, pos)) == 1
+            pos += 1
+        else
+            break
+        end
+    end
+    return substring(text, start, pos - start), pos
+end
+
+## Parses a hexadecimal digit string into an integer.
+##
+## Stops at the first non-hex character.
+##
+## ### Parameters
+## - `s`: Hex source string (no `0x` prefix).
+##
+## ### Returns
+## The parsed integer value.
+function parse_hex_code(s: string) -> int
+    let res = 0
+    let i = 0
+    let n = len(s)
+    while i < n
+        let c = ord(char_at(s, i))
+        if c >= 48 and c <= 57
+            res = res * 16 + (c - 48)
+        elif c >= 97 and c <= 102
+            res = res * 16 + (c - 97 + 10)
+        elif c >= 65 and c <= 70
+            res = res * 16 + (c - 65 + 10)
+        else
+            return res
+        end
+        i += 1
+    end
+    return res
+end
+
+## Parses an entity or character reference at the given position.
+##
+## Handles `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, decimal
+## (`&#65;`) and hexadecimal (`&#x41;`) references. Unknown entities pass
+## through literally; a bare `&` without a terminator yields `"&"`.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of `&`.
+## - `text_len`: Total text length.
+##
+## ### Returns
+## A `(value, end_pos)` tuple.
+pub function parse_entity(text: string, pos: int, text_len: int)
+    let i = pos + 1
+    let ename = ""
+    while i < text_len
+        let ch = char_at(text, i)
+        if ch == ";"
+            break
+        end
+        if ch == " " or ch == "\t" or ch == "\r" or ch == "\n" or ch == "<" or ch == "&"
+            return "&", pos + 1
+        end
+        ename += ch
+        i += 1
+        if len(ename) > 12
+            return "&", pos + 1
+        end
+    end
+    if i >= text_len or char_at(text, i) != ";"
+        return "&", pos + 1
+    end
+    let end_pos = i + 1
+    if ename == "amp"
+        return "&", end_pos
+    end
+    if ename == "lt"
+        return "<", end_pos
+    end
+    if ename == "gt"
+        return ">", end_pos
+    end
+    if ename == "quot"
+        return "\"", end_pos
+    end
+    if ename == "apos"
+        return "'", end_pos
+    end
+    let elen = len(ename)
+    if elen >= 2 and char_at(ename, 0) == "#"
+        if char_at(ename, 1) == "x" or char_at(ename, 1) == "X"
+            if elen > 2
+                let hexpart = substring(ename, 2, elen - 2)
+                return chr(parse_hex_code(hexpart)), end_pos
+            end
+        else
+            let digits = substring(ename, 1, elen - 1)
+            let di = 0
+            let dlen = len(digits)
+            let all_digits = 1
+            while di < dlen
+                if is_digit(char_at(digits, di)) == 0
+                    all_digits = 0
+                    break
+                end
+                di += 1
+            end
+            if all_digits == 1 and dlen > 0
+                return chr(to_int(digits)), end_pos
+            end
+        end
+    end
+    return substring(text, pos, end_pos - pos), end_pos
+end
+
+## Parses a quoted attribute value with entity decoding.
+##
+## Tab, LF, and CR normalize to a space per XML 1.0 attribute processing.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of the opening quote (`"` or `'`).
+## - `text_len`: Total text length.
+##
+## ### Returns
+## A `(value, end_pos)` tuple.
+pub function parse_attr_value(text: string, pos: int, text_len: int)
+    let quote = char_at(text, pos)
+    pos += 1
+    let res = ""
+    while pos < text_len
+        let ch = char_at(text, pos)
+        if ch == quote
+            pos += 1
+            break
+        elif ch == "&"
+            let ev, evpos = parse_entity(text, pos, text_len)
+            res += ev
+            pos = evpos
+        elif ch == "\t" or ch == "\n" or ch == "\r"
+            res += " "
+            pos += 1
+        else
+            res += ch
+            pos += 1
+        end
+    end
+    return res, pos
+end
+
+## Parses a `<![CDATA[ ... ]]>` section body.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of `<` (the `<![CDATA[` opener must be verified).
+## - `text_len`: Total text length.
+##
+## ### Returns
+## A `(content, end_pos)` tuple with the raw (undecoded) content.
+pub function parse_cdata(text: string, pos: int, text_len: int)
+    pos += 9
+    let start = pos
+    while pos < text_len
+        if pos + 2 < text_len and substring(text, pos, 3) == "]]>"
+            return substring(text, start, pos - start), pos + 3
+        end
+        pos += 1
+    end
+    return substring(text, start, pos - start), pos
+end
+
+## Parses one element (open tag, content, close tag) at the given position.
+##
+## ### Parameters
+## - `text`: Source text.
+## - `pos`: Position of `<` opening the element.
+## - `text_len`: Total text length.
+##
+## ### Returns
+## A `(node, end_pos)` tuple.
+pub function parse_element(text: string, pos: int, text_len: int)
+    pos += 1
+    pos = skip_ws(text, pos, text_len)
+    let ename, epos = parse_name(text, pos, text_len)
+    pos = epos
+    let attrs = map()
+    let self_close = 0
+    let tag_done = 0
+    while pos < text_len and tag_done == 0
+        pos = skip_ws(text, pos, text_len)
+        if pos >= text_len
+            break
+        end
+        let tch = char_at(text, pos)
+        if tch == ">"
+            pos += 1
+            tag_done = 1
+        elif tch == "/"
+            if pos + 1 < text_len and char_at(text, pos + 1) == ">"
+                pos += 2
+                self_close = 1
+                tag_done = 1
+            else
+                pos += 1
+            end
+        elif is_name_start_char(tch) == 1
+            let aname, apos = parse_name(text, pos, text_len)
+            pos = skip_ws(text, apos, text_len)
+            if pos < text_len and char_at(text, pos) == "="
+                pos += 1
+                pos = skip_ws(text, pos, text_len)
+                if pos < text_len and (char_at(text, pos) == "\"" or char_at(text, pos) == "'")
+                    let aval, avpos = parse_attr_value(text, pos, text_len)
+                    attrs[aname] = aval
+                    pos = avpos
+                else
+                    let bare = ""
+                    while pos < text_len
+                        let bch = char_at(text, pos)
+                        if is_whitespace(bch) == 1 or bch == ">" or bch == "/"
+                            break
+                        end
+                        bare += bch
+                        pos += 1
+                    end
+                    attrs[aname] = bare
+                end
+            else
+                attrs[aname] = ""
+            end
+        else
+            pos += 1
+        end
+    end
+    if self_close == 1
+        return make_element(ename, attrs, [], ""), pos
+    end
+    let children = []
+    let buf = ""
+    while pos < text_len
+        let cch = char_at(text, pos)
+        if cch == "<"
+            if pos + 1 < text_len and substring(text, pos, 2) == "</"
+                let cpos = pos + 2
+                cpos = skip_ws(text, cpos, text_len)
+                let cname, cpos2 = parse_name(text, cpos, text_len)
+                cpos = skip_ws(text, cpos2, text_len)
+                if cpos < text_len and char_at(text, cpos) == ">"
+                    cpos += 1
+                end
+                pos = cpos
+                break
+            elif pos + 3 < text_len and substring(text, pos, 4) == "<!--"
+                pos = skip_comment(text, pos, text_len)
+            elif pos + 8 < text_len and substring(text, pos, 9) == "<![CDATA["
+                let cdata, cdpos = parse_cdata(text, pos, text_len)
+                buf += cdata
+                pos = cdpos
+            elif pos + 1 < text_len and substring(text, pos, 2) == "<?"
+                pos = skip_pi(text, pos, text_len)
+            elif pos + 1 < text_len and substring(text, pos, 2) == "<!"
+                pos = skip_bang(text, pos, text_len)
+            else
+                let child, chpos = parse_element(text, pos, text_len)
+                children.push(child)
+                pos = chpos
+            end
+        elif cch == "&"
+            let cev, cevpos = parse_entity(text, pos, text_len)
+            buf += cev
+            pos = cevpos
+        else
+            buf += cch
+            pos += 1
+        end
+    end
+    return make_element(ename, attrs, children, buf), pos
+end
+
+## Reads a `name="value"` pair out of a declaration body string.
+##
+## ### Parameters
+## - `body`: Declaration body (e.g. `<?xml version="1.0" ... ?>`).
+## - `key`: Attribute key to look up.
+## - `fallback`: Value returned when the key is absent.
+##
+## ### Returns
+## The attribute value or the fallback.
+function decl_attr(body: string, key: string, fallback: string) -> string
+    let blen = len(body)
+    let klen = len(key)
+    let i = 0
+    while i + klen <= blen
+        if substring(body, i, klen) == key
+            let j = i + klen
+            j = skip_ws(body, j, blen)
+            if j < blen and char_at(body, j) == "="
+                j += 1
+                j = skip_ws(body, j, blen)
+                if j < blen and (char_at(body, j) == "\"" or char_at(body, j) == "'")
+                    let quote = char_at(body, j)
+                    j += 1
+                    let val = ""
+                    while j < blen and char_at(body, j) != quote
+                        val += char_at(body, j)
+                        j += 1
+                    end
+                    return val
+                end
+            end
+        end
+        i += 1
+    end
+    return fallback
+end
+
+## Parses an XML document string into its root element node.
+##
+## Skips leading and trailing miscellaneous markup (comments, processing
+## instructions, DOCTYPE). Returns null for empty documents.
+##
+## ### Parameters
+## - `text`: XML document string.
+##
+## ### Returns
+## The root `XmlNode`, or null when no element is present.
+##
+## ### Examples
+## ```alya
+## let root = parse_xml("<a><b>x</b></a>")
+## ```
+pub function parse_xml(text: string)
+    let text_len = len(text)
+    let pos = skip_misc(text, 0, text_len)
+    if pos >= text_len
+        return null
+    end
+    if char_at(text, pos) != "<"
+        return null
+    end
+    if pos + 1 < text_len and substring(text, pos, 2) == "</"
+        return null
+    end
+    let root, _ = parse_element(text, pos, text_len)
+    if root is null
+        return null
+    end
+    return root
+end
+
+## Parses an XML document string into an `XmlDoc` with declaration metadata.
+##
+## Reads the `<?xml version="..." encoding="..."?>` prolog when present
+## (defaulting to `"1.0"` / `"UTF-8"`) and parses the root element.
+##
+## ### Parameters
+## - `text`: XML document string.
+##
+## ### Returns
+## The parsed `XmlDoc` instance.
+pub function parse_xml_doc(text: string) -> XmlDoc
+    let text_len = len(text)
+    let pos = skip_ws(text, 0, text_len)
+    let version = "1.0"
+    let encoding = "UTF-8"
+    if pos + 5 < text_len and substring(text, pos, 5) == "<?xml"
+        let q = pos + 5
+        while q < text_len
+            if q + 1 < text_len and substring(text, q, 2) == "?>"
+                q += 2
+                break
+            end
+            q += 1
+        end
+        let decl_body = substring(text, pos, q - pos)
+        version = decl_attr(decl_body, "version", "1.0")
+        encoding = decl_attr(decl_body, "encoding", "UTF-8")
+        pos = q
+    end
+    pos = skip_misc(text, pos, text_len)
+    if pos >= text_len
+        return make_doc(null, version, encoding)
+    end
+    if char_at(text, pos) != "<"
+        return make_doc(null, version, encoding)
+    end
+    if pos + 1 < text_len and substring(text, pos, 2) == "</"
+        return make_doc(null, version, encoding)
+    end
+    let root, rpos = parse_element(text, pos, text_len)
+    return make_doc(root, version, encoding)
+end

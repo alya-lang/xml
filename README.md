@@ -5,20 +5,22 @@
 [![Alya](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Falya-lang%2Fxml%2Fmain%2Falya.toml&query=%24.package.alya-version&label=Alya&color=orange&prefix=%3E%3D)](https://github.com/alya-lang/alya)
 [![Package Version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Falya-lang%2Fxml%2Fmain%2Falya.toml&query=%24.package.version&label=Version&color=brightgreen)](alya.toml)
 
-Fast, zero-dependency XML 1.0 parser and serializer for Alya
+A fast, zero-dependency XML 1.0 parser and serializer for the Alya Programming Language.
 
 ---
 
 ## 🌟 Features
 
-- ⚡ **Lightweight & High Performance**: Minimal memory overhead, zero runtime bloat, and fast native execution
-- 🧩 **Modular Architecture**: Layered multi-module design featuring a clean public facade (`src/lib.alya`), rich data models (`src/types.alya`), and encapsulated core formatters (`src/core/formatter.alya`)
-- 🔒 **Public/Private Visibility (`pub`)**: Fine-grained export control with `pub` for public functions, structs, and enums, keeping internal helper functions private and encapsulated
-- 🎭 **Structural Duck Typing & Interfaces**: Dynamic interface dispatch (`Summarizable`, `Describable`) without brittle inheritance hierarchies
-- 📦 **Rich Domain Models & Enums**: Idiomatic `enum` types (`XmlStatus`, `XmlPriority`, `XmlStyle`) and typed data containers (`XmlConfig`, `XmlResult`, `XmlStats`)
-- 🎯 **Advanced Pattern Matching**: Clean branching with `when` expressions, range matching, and condition guards
-- 🛡️ **Defensive Result Pattern**: Structured error handling and outcome encapsulation with `ok_result` and `error_result`
-- 🧪 **Enterprise Test & Benchmark Suite**: 100% test coverage with standard assertions (`std/test`) and micro-benchmarking (`std/test` bench runner)
+- ⚡ **High Performance**: Parses ~19,000 documents/sec, >3M lookups/sec and >400K serializations/sec.
+- 📐 **Practical XML 1.0 Coverage**:
+  - **Elements**: Nested elements, mixed text content, and self-closing tags (`<tls/>`).
+  - **Attributes**: Single/double-quoted values, entity decoding, and whitespace normalization.
+  - **Prolog & Misc**: `<?xml version="..." encoding="..."?>` declarations, comments (`<!-- -->`), processing instructions (`<?...?>`), and `DOCTYPE` blocks (including `[...]` internal subsets).
+  - **CDATA**: `<![CDATA[ ... ]]>` sections kept verbatim.
+  - **References**: Predefined entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`) plus decimal (`&#65;`) and hexadecimal (`&#x41;`) character references; unknown entities pass through literally.
+  - **Path Navigation**: Dot-separated element queries (`catalog.book.title`), recursive `find_all`, and trimmed text helpers.
+- 🛠️ **Builder API**: Programmatically construct documents (`make_element`, `set_attr`, `add_child`, `set_text`) and serialize compact or pretty-printed.
+- 🧪 **100% Verified**: 118 assertions passing, verified on Windows (Linux/macOS via CI).
 
 ---
 
@@ -26,41 +28,32 @@ Fast, zero-dependency XML 1.0 parser and serializer for Alya
 
 ```
 xml/
-├── .alyalint               # Linter configuration (rules, exclusions, severity overrides)
-├── .editorconfig           # Uniform formatting rules across IDEs and editors
-├── .gitignore              # Ecosystem standard ignore filters
-├── .vscode/                # VS Code workspace settings, DAP launch configurations & tasks
-├── alya.toml               # Package manifest with dependencies and optional [build]
-├── c/                      # (Optional) Native C sources for zero-dependency FFI packages
+├── alya.toml               # Package manifest
 ├── src/
-│   ├── lib.alya            # Public API facade (pub exports, re-exports & pipeline runners)
-│   ├── types.alya          # Data models, pub enums, pub structs, and struct methods
-│   ├── ffi.alya            # (Optional) Native extern "C" declarations
-│   └── core/               # Subdirectory module hierarchy
-│       └── formatter.alya  # Domain formatting routines, salutation builders & pattern matchers
+│   ├── lib.alya            # Public API facade (parse, accessors, XmlDoc methods, file IO)
+│   ├── parser.alya         # XML 1.0 parser (misc skipping, entities, elements, documents)
+│   ├── serializer.alya     # Escaping, compact/pretty rendering & builder helpers
+│   └── types.alya          # XmlNode/XmlDoc structs, XmlNodeType enum, name classifiers
 ├── examples/
-│   └── demo.alya           # Comprehensive runnable walkthrough of all package capabilities
+│   └── demo.alya           # Comprehensive usage example
 ├── tests/
-│   └── test_basic.alya     # Automated test suite with 100% feature coverage
+│   └── test_basic.alya     # Full 14-part automated test suite (118 assertions)
 └── benches/
-    └── bench_basic.alya    # Micro-benchmarks measuring performance and throughput
+    └── bench_basic.alya    # Micro-benchmarks for parsing, lookup, and serialization
 ```
-
-> [!NOTE]
-> **Visibility & Modularity:** Symbols annotated with `pub` (`pub function`, `pub struct`, `pub enum`, `pub interface`) are exported to external consumers and re-exporting modules. Symbols without `pub` remain strictly internal to their declaring module, preventing symbol collisions and implementation leakage.
 
 ---
 
 ## 📦 Installation
 
-Add `xml` to the `[dependencies]` section in your `alya.toml`:
+Add `xml` to your `alya.toml`:
 
 ```toml
 [dependencies]
 xml = { git = "https://github.com/alya-lang/xml", branch = "main" }
 ```
 
-Or install it directly using the Alya package CLI:
+Or install it directly via the Alya CLI:
 
 ```bash
 alya add xml --git https://github.com/alya-lang/xml --branch main
@@ -71,22 +64,55 @@ alya install
 
 ## 🚀 Quick Start
 
+### 1. Parsing and Querying XML
+
 ```alya
-import "xml" as pkg
+import "xml"
 
 function main()
-    # 1. Basic facade call with default parameter
-    let greeting = pkg::hello()
-    say f"Greeting:  {greeting}"
+    let text = "
+<inventory region=\"eu-central\">
+    <service id=\"api-1\" tls=\"true\">
+        <name>gateway</name>
+        <port>8080</port>
+    </service>
+</inventory>
+"
+    let root = xml::parse(text)
+    say xml::get_attr(root, "region")      # "eu-central"
+    say xml::text_at(root, "service.name") # "gateway"
+    say xml::text_at(root, "service.port") # "8080"
+end
 
-    # 2. Struct configuration with priority, style, and methods
-    let cfg = pkg::new_config("Community", 5, pkg::XmlPriority.High, pkg::XmlStyle.Formal)
-    say f"Summary:   {cfg.summary()}"
-    say f"Formatted: {pkg::core_format_custom(cfg)}"
+main()
+```
 
-    # 3. Processing pipeline returning Result model
-    let res = pkg::process("Analytics", 3, pkg::XmlPriority.Critical)
-    say f"Outcome:   {res.message}"
+### 2. Declaration Metadata and Serialization
+
+```alya
+import "xml"
+
+function main()
+    let doc = xml::parse_doc("<?xml version=\"1.0\" encoding=\"UTF-8\"?><a>t</a>")
+    say doc.version   # "1.0"
+    say doc.encoding  # "UTF-8"
+    say doc.to_string(1)
+end
+
+main()
+```
+
+### 3. Building Documents Programmatically
+
+```alya
+import "xml"
+
+function main()
+    let root = xml::make_element("server")
+    xml::set_attr(root, "host", "0.0.0.0")
+    xml::add_child(root, xml::set_text(xml::make_element("name"), "edge"))
+    xml::add_child(root, xml::make_element("tls"))
+    say xml::stringify(root, 1)
 end
 
 main()
@@ -96,46 +122,42 @@ main()
 
 ## 📖 API Reference
 
-| Symbol | Visibility | Description |
-|---|---|---|
-| `hello(name = "World")` | `pub function` | Returns a formatted greeting string. Defaults to `"World"` if null or empty. |
-| `new_config(name, count, priority, style)` | `pub function` | Factory constructing a `XmlConfig` with sensible defaults. |
-| `make_config(name, count, priority, style, enabled, tags)` | `pub function` | Full constructor for `XmlConfig`. |
-| `process(label, count, priority)` | `pub function` | Runs processing pipeline, returning an `ok_result` `XmlResult`. |
-| `process_batch(labels)` | `pub function` | Formats an array of labels in batch, returning an array of strings. |
-| `ok_result(value, message)` | `pub function` | Constructs a successful `XmlResult` container (`status = 0`). |
-| `error_result(message, errors)` | `pub function` | Constructs a failed `XmlResult` container (`status = 1`). |
-| `make_stats(total, passed, failed, skipped)` | `pub function` | Constructs a `XmlStats` metrics record. |
-| `format_summary(cfg)` | `pub function` | Formats summary of a config instance (satisfies `Summarizable`). |
-| `format_description(cfg)` | `pub function` | Formats description of a config instance (satisfies `Describable`). |
-| `format_config(config)` | `pub function` | Multi-field formatter producing descriptive overview of a `XmlConfig`. |
-| `format_result(result)` | `pub function` | Formats a `XmlResult` into `[OK]` or `[ERROR]` status line. |
-| `format_stats(stats)` | `pub function` | Formats total checked items and success rate percentage. |
-| `clamp(n, min_val, max_val)` | `pub function` | Clamps an integer value to the closed range `[min_val, max_val]`. |
-| `pluralize(n, singular, plural)` | `pub function` | Pattern-matches count to return singular or plural noun form. |
-| `repeat_string(label, count)` | `pub function` | Repeats a string into an array of `count` items. |
-| `Summarizable` | `pub interface` | Structural contract requiring `summary(self) -> string`. |
-| `Describable` | `pub interface` | Structural contract requiring `describe(self) -> string` and `is_valid(self) -> int`. |
-| `XmlStatus` | `pub enum` | Lifecycle status codes (`Pending = 0`, `Active = 1`, `Archived = 2`, `Error = 3`). |
-| `XmlPriority` | `pub enum` | Priority tiers (`Low = 0`, `Normal = 1`, `High = 2`, `Critical = 3`). |
-| `XmlStyle` | `pub enum` | Presentation styles (`Standard = 0`, `Formal = 1`, `Casual = 2`). |
-| `XmlConfig` | `pub struct` | Primary configuration model (`name`, `count`, `priority`, `style`, `enabled`, `tags`). |
-| `XmlConfig.summary()` | `pub method` | Single-line formatted summary (satisfies `Summarizable`). |
-| `XmlConfig.describe()` | `pub method` | Detailed multi-field description (satisfies `Describable`). |
-| `XmlConfig.is_valid()` | `pub method` | Validation guard returning 1 if valid, 0 otherwise. |
-| `XmlConfig.is_enabled()` | `pub method` | Returns 1 if active, 0 if disabled. |
-| `XmlConfig.with_name(new_name)` | `pub method` | Immutable copy with updated name. |
-| `XmlConfig.with_priority(new_prio)` | `pub method` | Immutable copy with updated priority tier. |
-| `XmlResult` | `pub struct` | Operation outcome model (`value`, `status`, `message`, `errors`). |
-| `XmlResult.is_ok()` | `pub method` | Returns 1 if successful (`status == 0`), 0 otherwise. |
-| `XmlResult.is_error()` | `pub method` | Returns 1 if error (`status != 0`), 0 otherwise. |
-| `XmlResult.unwrap_or(fallback)` | `pub method` | Returns message on success, or fallback on error. |
-| `XmlStats` | `pub struct` | Run statistics model (`total`, `passed`, `failed`, `skipped`). |
-| `XmlStats.total_checked()` | `pub method` | Sum of passed and failed items count. |
-| `XmlStats.success_rate()` | `pub method` | Computed percentage string (e.g. `"95%"`). |
-
-> [!TIP]
-> **Internal Helpers & Documentation:** Public symbols are documented with `##` Markdown docstrings, enabling automatic API documentation generation via `alya doc`. Private functions such as `build_salutation` and `build_priority_label` in `src/core/formatter.alya` are not annotated with `pub` and remain encapsulated within their respective modules.
+| Symbol | Description |
+|---|---|
+| `parse(text)` | Parses XML into the root `XmlNode` (null when no element is present). |
+| `parse_doc(text)` | Parses XML into an `XmlDoc` with `version`/`encoding` metadata. |
+| `load_file(path)` | Reads a file and parses it into a root node. |
+| `load_doc(path)` | Reads a file into an `XmlDoc`. |
+| `is_valid(text)` | `1` when the text holds a well-formed element, `0` otherwise. |
+| `get_attr(node, key, default="")` | Attribute value or default (null-safe). |
+| `has_attr(node, key)` | `1` when the attribute exists, `0` otherwise. |
+| `children(node)` | Direct child element array (empty when none). |
+| `child_count(node)` | Direct child element count. |
+| `children_by_name(node, name)` | Direct children filtered by tag name. |
+| `first_child(node, name)` | First matching child, or null. |
+| `text_of(node, default="")` | Raw text content or default. |
+| `find_path(node, path)` | Dot-separated descent (`"a.b.c"`), first match per level. |
+| `find_all(node, name)` | Recursive descendant collection in document order. |
+| `text_at(node, path, default="")` | Trimmed text at a path, or default. |
+| `XmlDoc.find(path)` | `find_path` from the document root. |
+| `XmlDoc.find_all(name)` | `find_all` from the document root. |
+| `XmlDoc.text_at(path, default="")` | `text_at` from the document root. |
+| `XmlDoc.to_string(pretty=0)` | Serializes the document with declaration. |
+| `stringify(node, pretty=0)` | Serializes a node tree (compact or indented). |
+| `stringify_doc(doc, pretty=0)` | Serializes a document with declaration. |
+| `dump_file(path, xml_str)` | Writes an XML string to disk. |
+| `make_element(name, attrs, children, text)` | Element factory with null-safe containers. |
+| `make_doc(root, version, encoding)` | Document factory with declaration defaults. |
+| `set_attr(node, key, val)` | Sets an attribute, returns the node for chaining. |
+| `add_child(node, child)` | Appends a child, returns the parent for chaining. |
+| `set_text(node, text)` | Copy with replaced text content. |
+| `escape_text(s)` | Escapes `&`, `<`, `>` for text content. |
+| `escape_attr(s)` | Escapes `&`, `<`, `"`, and whitespace controls for attributes. |
+| `is_valid_name(name)` | `1` when the string is a valid XML name. |
+| `declaration(version, encoding)` | Builds an `<?xml ... ?>` declaration string. |
+| `XmlNodeType` | Node kind enum (`Element = 1`, `Text = 2`). |
+| `XmlNode` | Element struct (`name`, `attrs`, `children`, `text`). |
+| `XmlDoc` | Document struct (`root`, `version`, `encoding`). |
 
 ---
 
@@ -176,15 +198,6 @@ Run static code linter:
 ```bash
 alya lint . --check
 ```
-
----
-
-### 💻 Developer Tooling & VS Code Integration
-
-This package comes preconfigured with recommended workspace settings and tasks for **Visual Studio Code**:
-- **LSP & Formatting**: Auto-formatting on save and real-time Language Server diagnostics via `alya-lang.vscode-alya`.
-- **DAP Debugging**: Launch configurations in `.vscode/launch.json` ready for interactive step-debugging via `F5`.
-- **Predefined Tasks**: Press `Ctrl+Shift+B` or run tasks (`Test`, `Lint`, `Format`, `Build Docs`) directly from the Command Palette.
 
 ---
 

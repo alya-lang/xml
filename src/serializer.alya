@@ -1,0 +1,286 @@
+## # xml/serializer
+##
+## XML value escaping, element serialization, and builder helpers.
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+##
+## Serializes `XmlNode` trees back to XML text in compact or indented
+## (pretty) form, and offers builder helpers for programmatic documents.
+
+import "./types.alya"
+
+## Escapes text content (`&`, `<`, `>`).
+##
+## ### Parameters
+## - `s`: Raw text value (null yields `""`).
+##
+## ### Returns
+## The escaped XML text string.
+pub function escape_text(s: string) -> string
+    if s is null
+        return ""
+    end
+    let res = ""
+    let i = 0
+    let n = len(s)
+    while i < n
+        let ch = char_at(s, i)
+        let e = when ch
+            is "&" => "&amp;"
+            is "<" => "&lt;"
+            is ">" => "&gt;"
+            else => ch
+        end
+        res += e
+        i += 1
+    end
+    return res
+end
+
+## Escapes an attribute value (`&`, `<`, `"`, plus whitespace controls).
+##
+## Tab, LF, and CR are emitted as character references so a parse round-trip
+## preserves them instead of normalizing them to spaces.
+##
+## ### Parameters
+## - `s`: Raw attribute value (null yields `""`).
+##
+## ### Returns
+## The escaped XML attribute string.
+pub function escape_attr(s: string) -> string
+    if s is null
+        return ""
+    end
+    let res = ""
+    let i = 0
+    let n = len(s)
+    while i < n
+        let ch = char_at(s, i)
+        let e = when ch
+            is "&" => "&amp;"
+            is "<" => "&lt;"
+            is "\"" => "&quot;"
+            is "\t" => "&#9;"
+            is "\n" => "&#10;"
+            is "\r" => "&#13;"
+            else => ch
+        end
+        res += e
+        i += 1
+    end
+    return res
+end
+
+## Checks whether a string is a valid XML name.
+##
+## Requires a non-empty string starting with a name-start character
+## followed by name characters (ASCII subset of the XML 1.0 production).
+##
+## ### Parameters
+## - `name`: Candidate tag or attribute name (or null).
+##
+## ### Returns
+## `1` when valid, `0` otherwise.
+pub function is_valid_name(name: string) -> int
+    if name is null or len(name) == 0
+        return 0
+    end
+    if is_name_start_char(char_at(name, 0)) == 0
+        return 0
+    end
+    let i = 1
+    let n = len(name)
+    while i < n
+        if is_name_char(char_at(name, i)) == 0
+            return 0
+        end
+        i += 1
+    end
+    return 1
+end
+
+## Renders indentation padding (two spaces per level).
+##
+## ### Parameters
+## - `level`: Nesting depth.
+##
+## ### Returns
+## The padding string.
+function indent_pad(level: int) -> string
+    let res = ""
+    let i = 0
+    while i < level
+        res += "  "
+        i += 1
+    end
+    return res
+end
+
+## Renders an attribute map to ` key="value"` fragments.
+##
+## ### Parameters
+## - `attrs`: Attribute map (or null).
+##
+## ### Returns
+## The concatenated attribute string (empty when no attributes).
+function render_attrs(attrs) -> string
+    if attrs is null
+        return ""
+    end
+    let res = ""
+    let names = keys(attrs)
+    for aname in names
+        let aval = escape_attr(attrs[aname])
+        res += " {aname}=\"{aval}\""
+    end
+    return res
+end
+
+## Renders one node (and its subtree) to XML text.
+##
+## Empty elements use the self-closing form. In pretty mode, child elements
+## go on their own lines while leaf text stays inline with its tags.
+##
+## ### Parameters
+## - `node`: Target `XmlNode`.
+## - `pretty`: `1` for indented output, `0` for compact output.
+## - `level`: Current nesting depth.
+##
+## ### Returns
+## The rendered XML string.
+function render_node(node, pretty: int, level: int) -> string
+    let n = node.name
+    let astr = render_attrs(node.attrs)
+    let kid_count = len(node.children)
+    let has_text = len(node.text)
+    if kid_count == 0 and has_text == 0
+        if pretty == 1
+            let pad = indent_pad(level)
+            return "{pad}<{n}{astr}/>"
+        end
+        return "<{n}{astr}/>"
+    end
+    if kid_count == 0
+        let etext = escape_text(node.text)
+        if pretty == 1
+            let pad = indent_pad(level)
+            return "{pad}<{n}{astr}>{etext}</{n}>"
+        end
+        return "<{n}{astr}>{etext}</{n}>"
+    end
+    if pretty == 1
+        let pad = indent_pad(level)
+        let res = "{pad}<{n}{astr}>"
+        let t = trim(node.text)
+        if len(t) > 0
+            res += escape_text(t)
+        end
+        let i = 0
+        while i < kid_count
+            res += "\n" + render_node(node.children[i], pretty, level + 1)
+            i += 1
+        end
+        res += "\n{pad}</{n}>"
+        return res
+    end
+    let res = "<{n}{astr}>"
+    res += escape_text(node.text)
+    let k = 0
+    while k < kid_count
+        res += render_node(node.children[k], pretty, level + 1)
+        k += 1
+    end
+    res += "</{n}>"
+    return res
+end
+
+## Serializes a node tree to an XML string.
+##
+## ### Parameters
+## - `node`: Root `XmlNode` (null yields `""`).
+## - `pretty`: `1` for indented output, `0` for compact output. Defaults to `0`.
+##
+## ### Returns
+## The XML document string.
+pub function node_to_string(node, pretty: int = 0) -> string
+    if node is null
+        return ""
+    end
+    return render_node(node, pretty, 0)
+end
+
+## Builds an XML declaration string.
+##
+## ### Parameters
+## - `version`: XML version string. Defaults to `"1.0"`.
+## - `encoding`: Encoding label string. Defaults to `"UTF-8"`.
+##
+## ### Returns
+## The `<?xml ... ?>` declaration string.
+pub function declaration(version: string = "1.0", encoding: string = "UTF-8") -> string
+    return "<?xml version=\"{version}\" encoding=\"{encoding}\"?>"
+end
+
+## Serializes a document (declaration plus root) to an XML string.
+##
+## ### Parameters
+## - `doc`: Target `XmlDoc`.
+## - `pretty`: `1` for indented output, `0` for compact output. Defaults to `0`.
+##
+## ### Returns
+## The XML document string including the declaration line.
+pub function doc_to_string(doc: XmlDoc, pretty: int = 0) -> string
+    let decl = declaration(doc.version, doc.encoding)
+    if doc.root is null
+        return decl
+    end
+    let body = render_node(doc.root, pretty, 0)
+    return "{decl}\n{body}"
+end
+
+# ───────────────────────────────────────────────────────────────
+# XML Builder API
+# ───────────────────────────────────────────────────────────────
+
+## Sets an attribute on a node, returning the node for chaining.
+##
+## ### Parameters
+## - `node`: Target `XmlNode`.
+## - `key`: Attribute name string.
+## - `val`: Attribute value string.
+##
+## ### Returns
+## The updated node.
+pub function set_attr(node, key: string, val: string)
+    node.attrs[key] = val
+    return node
+end
+
+## Appends a child element, returning the parent for chaining.
+##
+## ### Parameters
+## - `node`: Parent `XmlNode`.
+## - `child`: Child `XmlNode` to append.
+##
+## ### Returns
+## The updated parent node.
+pub function add_child(node, child)
+    node.children.push(child)
+    return node
+end
+
+## Returns a node copy with replaced text content.
+##
+## ### Parameters
+## - `node`: Source `XmlNode`.
+## - `text`: New text content string.
+##
+## ### Returns
+## A new `XmlNode` sharing attributes and children with updated text.
+pub function set_text(node, text: string)
+    return XmlNode {
+        name: node.name,
+        attrs: node.attrs,
+        children: node.children,
+        text: text
+    }
+end

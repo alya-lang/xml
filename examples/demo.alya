@@ -1,152 +1,89 @@
-## Example usage and walkthrough for xml
+## Demo of the xml library
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
 
-import "../src/lib.alya" as pkg
+import "../src/lib.alya" as xml
 
 function main()
-    say "=== xml Package Showcase ==="
+    say "=== Alya XML Library Demo ==="
     say ""
 
-    # ───────────────────────────────────────────────────────────
-    # 1. Basic Facade Greeting
-    # ───────────────────────────────────────────────────────────
-    say "--- 1. Facade Greeting ---"
-    let greeting_default = pkg::hello()
-    say "Default: " + greeting_default
+    # 1. Sample service inventory document
+    let sample_xml = "
+<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!-- Production service inventory -->
+<inventory region=\"eu-central\">
+    <service id=\"api-1\" tls=\"true\">
+        <name>gateway</name>
+        <host>127.0.0.1</host>
+        <port>8080</port>
+        <note><![CDATA[Handles <all> public traffic & retries]]></note>
+    </service>
+    <service id=\"api-2\" tls=\"false\">
+        <name>worker</name>
+        <host>127.0.0.2</host>
+        <port>9000</port>
+        <note>Background jobs</note>
+    </service>
+</inventory>
+"
 
-    let greeting_custom = pkg::hello("Alya Developer")
-    say "Custom:  " + greeting_custom
+    # 2. Parse XML string with declaration metadata
+    say "1. Parsing document..."
+    let doc = xml::parse_doc(sample_xml)
+    say "✓ Parsed as XML {doc.version} ({doc.encoding})"
     say ""
 
-    # ───────────────────────────────────────────────────────────
-    # 2. Enumeration Values
-    # ───────────────────────────────────────────────────────────
-    say "--- 2. Enumeration Values ---"
-    say "XmlStatus.Pending  = " + str(pkg::XmlStatus.Pending)
-    say "XmlStatus.Active   = " + str(pkg::XmlStatus.Active)
-    say "XmlStatus.Archived = " + str(pkg::XmlStatus.Archived)
-    say "XmlStatus.Error    = " + str(pkg::XmlStatus.Error)
-
-    say "XmlPriority.Low      = " + str(pkg::XmlPriority.Low)
-    say "XmlPriority.Normal   = " + str(pkg::XmlPriority.Normal)
-    say "XmlPriority.High     = " + str(pkg::XmlPriority.High)
-    say "XmlPriority.Critical = " + str(pkg::XmlPriority.Critical)
-
-    say "XmlStyle.Standard = " + str(pkg::XmlStyle.Standard)
-    say "XmlStyle.Formal   = " + str(pkg::XmlStyle.Formal)
-    say "XmlStyle.Casual   = " + str(pkg::XmlStyle.Casual)
+    # 3. Attribute and path queries
+    say "2. Inspecting inventory:"
+    let region = xml::get_attr(doc.root, "region")
+    let first_name = doc.text_at("service.name")
+    let first_port = doc.text_at("service.port")
+    say "  • Region: {region}"
+    say "  • First service: {first_name}:{first_port}"
     say ""
 
-    # ───────────────────────────────────────────────────────────
-    # 3. Struct Models & Constructors
-    # ───────────────────────────────────────────────────────────
-    say "--- 3. Struct Models & Constructors ---"
-    let cfg = pkg::new_config("Community", 5, pkg::XmlPriority.High, pkg::XmlStyle.Formal)
-    say "Config Name:     " + cfg.name
-    say "Config Count:    " + str(cfg.count)
-    say "Config Priority: " + str(cfg.priority)
-    say "Config Style:    " + str(cfg.style)
-    say "Config Enabled:  " + str(cfg.enabled)
-
-    let stats = pkg::make_stats(100, 92, 6, 2)
-    say "Stats Total:     " + str(stats.total)
-    say "Stats Passed:    " + str(stats.passed)
-    say "Stats Failed:    " + str(stats.failed)
-    say "Stats Skipped:   " + str(stats.skipped)
-    say "Stats Checked:   " + str(stats.total_checked())
-    say "Stats Rate:      " + stats.success_rate()
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 4. Struct Methods & Immutability
-    # ───────────────────────────────────────────────────────────
-    say "--- 4. Struct Methods & Immutability ---"
-    say "Summary:         " + cfg.summary()
-    say "Description:     " + cfg.describe()
-    say "Is Valid:        " + str(cfg.is_valid())
-    say "Is Enabled:      " + str(cfg.is_enabled())
-
-    let updated_cfg = cfg.with_name("Core Contributors")
-    say "Updated Name:    " + updated_cfg.name
-    say "Original Name:   " + cfg.name
-
-    let critical_cfg = cfg.with_priority(pkg::XmlPriority.Critical)
-    say "Updated Prio:    " + str(critical_cfg.priority)
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 5. Result Container Pattern
-    # ───────────────────────────────────────────────────────────
-    say "--- 5. Result Container Pattern ---"
-    let ok_res = pkg::ok_result(42, "Processed payload successfully")
-    say "Ok Result is_ok:    " + str(ok_res.is_ok())
-    say "Ok Result message:  " + ok_res.message
-    say "Ok Result unwrap:   " + ok_res.unwrap_or("fallback")
-
-    let err_res = pkg::error_result("Processing failed", ["Disk full", "Permission denied"])
-    say "Err Result is_err:  " + str(err_res.is_error())
-    say "Err Result message: " + err_res.message
-    say "Err Result unwrap:  " + err_res.unwrap_or("safe default")
-    say "Err Count:          " + str(len(err_res.errors))
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 6. Structural Duck Typing (Interfaces)
-    # ───────────────────────────────────────────────────────────
-    say "--- 6. Duck Typing (Interfaces) ---"
-    if cfg is pkg::Summarizable
-        say "Summarizable dispatch: " + pkg::format_summary(cfg)
-    end
-    if cfg is pkg::Describable
-        say "Describable dispatch:  " + pkg::format_description(cfg)
+    # 4. Iterating repeated elements
+    say "3. Iterating services:"
+    let services = doc.find_all("service")
+    let i = 0
+    while i < len(services)
+        let svc = services[i]
+        let sid = xml::get_attr(svc, "id")
+        let sname = xml::text_at(svc, "name")
+        let sport = xml::text_at(svc, "port")
+        let stls = xml::get_attr(svc, "tls", "false")
+        let tls_label = "plain"
+        if stls == "true"
+            tls_label = "TLS"
+        end
+        say "  • [{tls_label}] {sid}: {sname} on port {sport}"
+        i += 1
     end
     say ""
 
-    # ───────────────────────────────────────────────────────────
-    # 7. Workflow Processing & Batching
-    # ───────────────────────────────────────────────────────────
-    say "--- 7. Workflow Processing & Batching ---"
-    let single_res = pkg::process("Analytics", 3, pkg::XmlPriority.High)
-    say "Single Process Result: " + pkg::format_result(single_res)
-
-    let items = ["Alpha", "Beta", "Gamma"]
-    let batch_res = pkg::process_batch(items)
-    say "Batch count: " + str(len(batch_res))
-    for b in batch_res
-        say "  - " + b
-    end
+    # 5. CDATA content arrives decoded
+    say "4. Reading CDATA note:"
+    let note = doc.text_at("service.note")
+    say "  • Note: {note}"
     say ""
 
-    # ───────────────────────────────────────────────────────────
-    # 8. Control Flow & Pattern Matching Utilities
-    # ───────────────────────────────────────────────────────────
-    say "--- 8. Utility Functions ---"
-    say "Clamp (-5 in [0, 100]):  " + str(pkg::clamp(-5, 0, 100))
-    say "Clamp (50 in [0, 100]):  " + str(pkg::clamp(50, 0, 100))
-    say "Clamp (150 in [0, 100]): " + str(pkg::clamp(150, 0, 100))
+    # 6. Programmatic document builder
+    say "5. Building XML programmatically:"
+    let root = xml::make_element("server")
+    xml::set_attr(root, "host", "0.0.0.0")
+    let name_node = xml::set_text(xml::make_element("name"), "edge")
+    xml::add_child(root, name_node)
+    xml::add_child(root, xml::make_element("tls"))
+    let out_xml = xml::stringify(root, 1)
+    say "----------------------------------------"
+    say out_xml
+    say "----------------------------------------"
 
-    say "Pluralize (1):           " + pkg::pluralize(1, "item", "items")
-    say "Pluralize (5):           " + pkg::pluralize(5, "item", "items")
-
-    let repeated = pkg::repeat_string("echo", 3)
-    say "Repeat string count:     " + str(len(repeated))
-    say ""
-
-    # ───────────────────────────────────────────────────────────
-    # 9. Destructuring: Tuples & Maps
-    # ───────────────────────────────────────────────────────────
-    say "--- 9. Destructuring ---"
-    let (label, count) = ("example", 42)
-    say "Tuple label: " + label
-    say "Tuple count: " + str(count)
-
-    let info = { "package": "xml", "version": "0.1.0" }
-    let { package: pkg_name, version: pkg_ver } = info
-    say "Map package: " + pkg_name
-    say "Map version: " + pkg_ver
-
-    say ""
-    say "Done!"
+    # 7. Round-trip back through the parser
+    let back = xml::parse(out_xml)
+    let back_host = xml::get_attr(back, "host")
+    say "  • Round-trip host: {back_host}"
+    say "✓ Demo completed successfully!"
 end
 
 main()
