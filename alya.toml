@@ -1,6 +1,6 @@
 [package]
 name = "xml"
-version = "0.1.0"
+version = "0.2.0"
 alya-version = "0.0.19"
 entry = "src/lib.alya"
 description = "Fast, zero-dependency XML 1.0 parser and serializer for Alya"

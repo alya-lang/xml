@@ -421,6 +421,7 @@ pub function parse_element(text: string, pos: int, text_len: int)
     let ename, epos = parse_name(text, pos, text_len)
     pos = epos
     let attrs = map()
+    let order = []
     let self_close = 0
     let tag_done = 0
     while pos < text_len and tag_done == 0
@@ -448,6 +449,9 @@ pub function parse_element(text: string, pos: int, text_len: int)
                 pos = skip_ws(text, pos, text_len)
                 if pos < text_len and (char_at(text, pos) == "\"" or char_at(text, pos) == "'")
                     let aval, avpos = parse_attr_value(text, pos, text_len)
+                    if _map_has(attrs, aname) == 0
+                        order.push(aname)
+                    end
                     attrs[aname] = aval
                     pos = avpos
                 else
@@ -460,9 +464,15 @@ pub function parse_element(text: string, pos: int, text_len: int)
                         bare += bch
                         pos += 1
                     end
+                    if _map_has(attrs, aname) == 0
+                        order.push(aname)
+                    end
                     attrs[aname] = bare
                 end
             else
+                if _map_has(attrs, aname) == 0
+                    order.push(aname)
+                end
                 attrs[aname] = ""
             end
         else
@@ -470,7 +480,13 @@ pub function parse_element(text: string, pos: int, text_len: int)
         end
     end
     if self_close == 1
-        return make_element(ename, attrs, [], ""), pos
+        return XmlNode {
+            name: ename,
+            attrs: attrs,
+            children: [],
+            text: "",
+            attr_order: order
+        }, pos
     end
     let children = []
     let buf = ""
@@ -511,7 +527,13 @@ pub function parse_element(text: string, pos: int, text_len: int)
             pos += 1
         end
     end
-    return make_element(ename, attrs, children, buf), pos
+    return XmlNode {
+        name: ename,
+        attrs: attrs,
+        children: children,
+        text: buf,
+        attr_order: order
+    }, pos
 end
 
 ## Reads a `name="value"` pair out of a declaration body string.
@@ -629,4 +651,161 @@ pub function parse_xml_doc(text: string) -> XmlDoc
     end
     let root, rpos = parse_element(text, pos, text_len)
     return make_doc(root, version, encoding)
+end
+
+## Validates structural well-formedness, reporting the first violation.
+##
+## Checks tag balance and names, quoted attribute values, `=` presence,
+## and root singularity. Entity strictness (e.g. bare `&`) is outside
+## this check and stays lenient by design.
+##
+## ### Parameters
+## - `text`: XML document string.
+##
+## ### Returns
+## `""` when well-formed, otherwise a reason with a byte offset
+## (e.g. `"mismatched close tag </b> for <a> at byte 6"`).
+##
+## ### Examples
+## ```alya
+## let err = check_wellformed("<a><b></a></b>")
+## ```
+pub function check_wellformed(text: string) -> string
+    let text_len = len(text)
+    let pos = skip_misc(text, skip_bom(text, text_len), text_len)
+    let stack = []
+    let saw_root = 0
+    while pos < text_len
+        let ch = char_at(text, pos)
+        if ch == "<"
+            if pos + 1 < text_len and substring(text, pos, 2) == "</"
+                let cpos = pos + 2
+                cpos = skip_ws(text, cpos, text_len)
+                let cname, cpos2 = parse_name(text, cpos, text_len)
+                if len(cname) == 0
+                    return "empty close tag at byte {pos}"
+                end
+                if is_name_start_char(char_at(cname, 0)) == 0
+                    return "invalid close tag name {cname} at byte {pos}"
+                end
+                cpos = skip_ws(text, cpos2, text_len)
+                if cpos < text_len and char_at(text, cpos) == ">"
+                    cpos += 1
+                else
+                    return "expected > to close </{cname}> at byte {pos}"
+                end
+                if len(stack) == 0
+                    return "stray close tag </{cname}> at byte {pos}"
+                end
+                let open = stack.pop()
+                if open != cname
+                    return "mismatched close tag </{cname}> for <{open}> at byte {pos}"
+                end
+                pos = cpos
+            elif pos + 3 < text_len and substring(text, pos, 4) == "<!--"
+                pos = skip_comment(text, pos, text_len)
+            elif pos + 1 < text_len and substring(text, pos, 2) == "<?"
+                pos = skip_pi(text, pos, text_len)
+            elif pos + 1 < text_len and substring(text, pos, 2) == "<!"
+                pos = skip_bang(text, pos, text_len)
+            else
+                let tag_start = pos
+                let opos = pos + 1
+                opos = skip_ws(text, opos, text_len)
+                let oname, opos2 = parse_name(text, opos, text_len)
+                if len(oname) == 0
+                    return "expected element name at byte {pos}"
+                end
+                if is_name_start_char(char_at(oname, 0)) == 0
+                    return "invalid element name {oname} at byte {pos}"
+                end
+                pos = opos2
+                let self_close = 0
+                let tag_done = 0
+                let wferr = ""
+                while pos < text_len and tag_done == 0
+                    pos = skip_ws(text, pos, text_len)
+                    if pos >= text_len
+                        break
+                    end
+                    let tch = char_at(text, pos)
+                    if tch == ">"
+                        pos += 1
+                        tag_done = 1
+                    elif tch == "/"
+                        if pos + 1 < text_len and char_at(text, pos + 1) == ">"
+                            pos += 2
+                            self_close = 1
+                            tag_done = 1
+                        else
+                            wferr = "expected > after / at byte {pos}"
+                            tag_done = 1
+                        end
+                    elif is_name_start_char(tch) == 1
+                        let aname, apos = parse_name(text, pos, text_len)
+                        pos = skip_ws(text, apos, text_len)
+                        if pos < text_len and char_at(text, pos) == "="
+                            pos += 1
+                            pos = skip_ws(text, pos, text_len)
+                            if pos < text_len and (char_at(text, pos) == "\"" or char_at(text, pos) == "'")
+                                let _, avpos = parse_attr_value(text, pos, text_len)
+                                pos = avpos
+                            else
+                                wferr = "unquoted attribute value for {aname} at byte {pos}"
+                                tag_done = 1
+                            end
+                        else
+                            wferr = "expected = after attribute {aname} at byte {pos}"
+                            tag_done = 1
+                        end
+                    else
+                        wferr = "unexpected character {tch} in tag <{oname}> at byte {pos}"
+                        tag_done = 1
+                    end
+                end
+                if wferr != ""
+                    return wferr
+                end
+                if tag_done == 0
+                    return "unterminated tag <{oname}> at byte {pos}"
+                end
+                if len(stack) == 0
+                    if saw_root == 1
+                        return "multiple root elements at byte {tag_start}"
+                    end
+                    saw_root = 1
+                end
+                if self_close == 0
+                    stack.push(oname)
+                end
+            end
+        else
+            let tstart = pos
+            while pos < text_len and char_at(text, pos) != "<"
+                pos += 1
+            end
+            let seg = substring(text, tstart, pos - tstart)
+            let si = 0
+            let seglen = len(seg)
+            let has_text = 0
+            while si < seglen
+                if is_whitespace(char_at(seg, si)) == 0
+                    has_text = 1
+                    break
+                end
+                si += 1
+            end
+            if has_text == 1 and len(stack) == 0
+                return "character content outside root element at byte {tstart}"
+            end
+        end
+    end
+    if len(stack) > 0
+        let open = stack.pop()
+        return "unclosed <{open}> at end of input (byte {text_len})"
+    end
+    if saw_root == 0
+        return "no root element"
+    end
+    return ""
 end

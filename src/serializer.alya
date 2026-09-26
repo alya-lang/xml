@@ -117,20 +117,36 @@ end
 
 ## Renders an attribute map to ` key="value"` fragments.
 ##
+## Attributes listed in the node's `attr_order` render first in document
+## order; any other entries (e.g. set by direct map assignment) follow
+## in map order.
+##
 ## ### Parameters
-## - `attrs`: Attribute map (or null).
+## - `node`: Target `XmlNode` (or null).
 ##
 ## ### Returns
 ## The concatenated attribute string (empty when no attributes).
-function render_attrs(attrs) -> string
-    if attrs is null
+function render_attrs(node) -> string
+    if node is null or node.attrs is null
         return ""
     end
     let res = ""
-    let names = keys(attrs)
+    let seen = map()
+    if node.attr_order is not null
+        for aname in node.attr_order
+            if _map_has(node.attrs, aname) == 1
+                let aval = escape_attr(node.attrs[aname])
+                res += " {aname}=\"{aval}\""
+                seen[aname] = 1
+            end
+        end
+    end
+    let names = keys(node.attrs)
     for aname in names
-        let aval = escape_attr(attrs[aname])
-        res += " {aname}=\"{aval}\""
+        if _map_has(seen, aname) == 0
+            let aval = escape_attr(node.attrs[aname])
+            res += " {aname}=\"{aval}\""
+        end
     end
     return res
 end
@@ -149,7 +165,7 @@ end
 ## The rendered XML string.
 function render_node(node, pretty: int, level: int) -> string
     let n = node.name
-    let astr = render_attrs(node.attrs)
+    let astr = render_attrs(node)
     let kid_count = len(node.children)
     let has_text = len(node.text)
     if kid_count == 0 and has_text == 0
@@ -251,6 +267,13 @@ end
 ## ### Returns
 ## The updated node.
 pub function set_attr(node, key: string, val: string)
+    if node.attr_order is null
+        node.attrs[key] = val
+        return node
+    end
+    if _map_has(node.attrs, key) == 0
+        node.attr_order.push(key)
+    end
     node.attrs[key] = val
     return node
 end
@@ -281,6 +304,7 @@ pub function set_text(node, text: string)
         name: node.name,
         attrs: node.attrs,
         children: node.children,
-        text: text
+        text: text,
+        attr_order: node.attr_order
     }
 end

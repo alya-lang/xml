@@ -1,0 +1,92 @@
+## Advanced regression tests for the xml library: attribute order,
+## strict validation, and namespace resolution.
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as xml
+
+function main()
+    test_suite("Alya XML Advanced Regression Suite")
+    let r = runner_new()
+
+    test_attr_order(r)
+    test_strict(r)
+    test_namespaces(r)
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+function test_attr_order(r)
+    let ordered = xml::parse("<s b=\"2\" a=\"1\" c=\"3\"/>")
+    runner_assert_str_eq(r, xml::stringify(ordered), "<s b=\"2\" a=\"1\" c=\"3\"/>", "document attribute order preserved")
+
+    let built = xml::make_element("e")
+    xml::set_attr(built, "z", "1")
+    xml::set_attr(built, "a", "2")
+    xml::set_attr(built, "m", "3")
+    runner_assert_str_eq(r, xml::stringify(built), "<e z=\"1\" a=\"2\" m=\"3\"/>", "builder attribute order follows set_attr calls")
+
+    let dup = xml::parse("<a x=\"1\" x=\"2\"/>")
+    runner_assert_str_eq(r, xml::get_attr(dup, "x"), "2", "duplicate attribute keeps last value")
+    runner_assert_str_eq(r, xml::stringify(dup), "<a x=\"2\"/>", "duplicate attribute serialized once")
+
+    let direct = xml::make_element("e")
+    direct.attrs["k"] = "v"
+    runner_assert_str_eq(r, xml::stringify(direct), "<e k=\"v\"/>", "direct map assignment still serializes")
+end
+
+function test_strict(r)
+    runner_assert_str_eq(r, xml::check_wellformed("<a><b></b></a>"), "", "balanced document validates clean")
+    runner_assert_str_eq(r, xml::check_wellformed("<a><b></a></b>"), "mismatched close tag </a> for <b> at byte 6", "mismatched close reported with position")
+    runner_assert_str_eq(r, xml::check_wellformed("<a><b></b>"), "unclosed <a> at end of input (byte 10)", "unclosed element reported")
+    runner_assert_str_eq(r, xml::check_wellformed("</a>"), "stray close tag </a> at byte 0", "stray close reported")
+    runner_assert_str_eq(r, xml::check_wellformed("<a></>"), "empty close tag at byte 3", "empty close reported")
+    runner_assert_str_eq(r, xml::check_wellformed("<a x=1/>"), "unquoted attribute value for x at byte 5", "unquoted value reported")
+    runner_assert_str_eq(r, xml::check_wellformed("<a debug/>"), "expected = after attribute debug at byte 8", "valueless attribute reported")
+    runner_assert_str_eq(r, xml::check_wellformed("<a/><b/>"), "multiple root elements at byte 4", "second root reported")
+    runner_assert_str_eq(r, xml::check_wellformed("hi<a/>"), "character content outside root element at byte 0", "stray text reported")
+    runner_assert_str_eq(r, xml::check_wellformed(""), "no root element", "empty document reported")
+
+    let ok_node = xml::parse_strict("<a><b>x</b></a>")
+    runner_assert_str_eq(r, ok_node.name, "a", "parse_strict accepts valid input")
+    runner_assert(r, xml::parse_strict("<a><b></a>") is null, "parse_strict rejects mismatched tags")
+    runner_assert(r, xml::parse_strict("<a x=1/>") is null, "parse_strict rejects unquoted attributes")
+
+    let ok_doc = xml::parse_doc_strict("<a>t</a>")
+    runner_assert_str_eq(r, ok_doc.root.name, "a", "parse_doc_strict accepts valid input")
+    let bad_doc = xml::parse_doc_strict("<a><b></a>")
+    runner_assert(r, bad_doc.root is null, "parse_doc_strict yields empty document on failure")
+end
+
+function test_namespaces(r)
+    runner_assert_str_eq(r, xml::local_name("a:item"), "item", "local_name strips prefix")
+    runner_assert_str_eq(r, xml::local_name("plain"), "plain", "local_name passes bare names through")
+    runner_assert_str_eq(r, xml::ns_prefix("a:item"), "a", "ns_prefix extracts prefix")
+    runner_assert_str_eq(r, xml::ns_prefix("plain"), "", "ns_prefix empty for bare names")
+
+    let root = xml::parse("<root xmlns=\"urn:def\" xmlns:a=\"urn:A\"><a:item id=\"1\">x</a:item><plain>y</plain></root>")
+    let scope = xml::ns_scope(root)
+    runner_assert_str_eq(r, scope[""], "urn:def", "default namespace in scope")
+    runner_assert_str_eq(r, scope["a"], "urn:A", "prefixed namespace in scope")
+
+    let items = xml::find_ns(root, "urn:A", "item")
+    runner_assert_eq(r, len(items), 1, "find_ns locates prefixed element")
+    runner_assert_str_eq(r, items[0].text, "x", "prefixed element text")
+
+    let plains = xml::find_ns(root, "urn:def", "plain")
+    runner_assert_eq(r, len(plains), 1, "default namespace applies to bare names")
+    runner_assert_str_eq(r, plains[0].text, "y", "default-namespaced text")
+    runner_assert_eq(r, len(xml::find_ns(root, "", "plain")), 0, "empty URI does not match default-namespaced element")
+    runner_assert_eq(r, len(xml::find_ns(root, "urn:A", "id")), 0, "attributes are never namespace-matched")
+
+    let over = xml::parse("<r xmlns:a=\"urn:1\"><a:x>o</a:x><s xmlns:a=\"urn:2\"><a:x>i</a:x></s></r>")
+    let outer = xml::find_ns(over, "urn:1", "x")
+    runner_assert_eq(r, len(outer), 1, "outer scope match count")
+    runner_assert_str_eq(r, outer[0].text, "o", "outer scope wins outside")
+    let inner = xml::find_ns(over, "urn:2", "x")
+    runner_assert_eq(r, len(inner), 1, "inner scope match count")
+    runner_assert_str_eq(r, inner[0].text, "i", "inner redeclaration wins inside")
+end

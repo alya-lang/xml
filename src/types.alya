@@ -22,11 +22,15 @@ end
 ## - `attrs`: Attribute map (e.g. `{"host": "127.0.0.1"}`).
 ## - `children`: Child `XmlNode` element array.
 ## - `text`: Concatenated character content with entities already decoded.
+## - `attr_order`: Attribute names in first-seen document order, driving
+##   serializer output. Built by the parser and `set_attr`; nodes made by
+##   hand with a missing `attr_order` fall back to map order.
 pub struct XmlNode
     name: string,
     attrs,
     children: array,
-    text: string
+    text: string,
+    attr_order: array
 end
 
 ## Document container wrapping the root element plus declaration metadata.
@@ -65,11 +69,17 @@ pub function make_element(name: string, attrs = null, children = null, text: str
     if c is null
         c = []
     end
+    let order = []
+    let akeys = keys(a)
+    for ak in akeys
+        order.push(ak)
+    end
     return XmlNode {
         name: name,
         attrs: a,
         children: c,
-        text: text
+        text: text,
+        attr_order: order
     }
 end
 

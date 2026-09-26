@@ -73,6 +73,38 @@ pub function is_valid(text: string) -> int
     return parse_xml(text) is not null
 end
 
+## Parses an XML string, returning null unless it is well-formed.
+##
+## Structural gate first (`check_wellformed`): mismatched tags, unquoted
+## attributes, and multiple roots yield null instead of lenient output.
+##
+## ### Parameters
+## - `text`: XML document string.
+##
+## ### Returns
+## The root `XmlNode`, or null when validation fails.
+pub function parse_strict(text: string)
+    if check_wellformed(text) != ""
+        return null
+    end
+    return parse_xml(text)
+end
+
+## Parses an XML string into an `XmlDoc`, returning an empty document
+## unless the input is well-formed.
+##
+## ### Parameters
+## - `text`: XML document string.
+##
+## ### Returns
+## The parsed `XmlDoc`, or an empty document on validation failure.
+pub function parse_doc_strict(text: string) -> XmlDoc
+    if check_wellformed(text) != ""
+        return make_doc(null, "1.0", "UTF-8")
+    end
+    return parse_xml_doc(text)
+end
+
 # ───────────────────────────────────────────────────────────────
 # 2. Accessor Helpers
 # ───────────────────────────────────────────────────────────────
@@ -276,6 +308,144 @@ pub function text_at(node, path_str: string, default_val: string = "") -> string
         return default_val
     end
     return trim(target.text)
+end
+
+# ───────────────────────────────────────────────────────────────
+# 2b. Namespace Helpers
+# ───────────────────────────────────────────────────────────────
+
+## Returns the local part of a qualified tag name.
+##
+## ### Parameters
+## - `qname`: Qualified name string (or null).
+##
+## ### Returns
+## The substring after the first `:`, or the whole name when unprefixed.
+pub function local_name(qname: string) -> string
+    if qname is null
+        return ""
+    end
+    let n = len(qname)
+    let i = 0
+    while i < n
+        if char_at(qname, i) == ":"
+            return substring(qname, i + 1, n - i - 1)
+        end
+        i += 1
+    end
+    return qname
+end
+
+## Returns the namespace prefix of a qualified tag name.
+##
+## ### Parameters
+## - `qname`: Qualified name string (or null).
+##
+## ### Returns
+## The substring before the first `:`, or `""` when unprefixed.
+pub function ns_prefix(qname: string) -> string
+    if qname is null
+        return ""
+    end
+    let n = len(qname)
+    let i = 0
+    while i < n
+        if char_at(qname, i) == ":"
+            return substring(qname, 0, i)
+        end
+        i += 1
+    end
+    return ""
+end
+
+## Collects namespace declarations (`xmlns`) on a single node.
+##
+## ### Parameters
+## - `node`: Target `XmlNode` (or null).
+##
+## ### Returns
+## A prefix-to-URI map; the default namespace (if any) sits under `""`.
+pub function ns_scope(node) -> map
+    let scope = map()
+    if node is null or node.attrs is null
+        return scope
+    end
+    let names = keys(node.attrs)
+    for aname in names
+        if aname == "xmlns"
+            scope[""] = node.attrs[aname]
+        elif len(aname) > 6 and substring(aname, 0, 6) == "xmlns:"
+            scope[substring(aname, 6, len(aname) - 6)] = node.attrs[aname]
+        end
+    end
+    return scope
+end
+
+## Recursively collects descendants matching a namespace URI and local name.
+##
+## Scope is inherited down the tree (inner `xmlns` wins); unprefixed
+## names resolve against the in-scope default namespace. Elements only —
+## attributes are never namespace-matched.
+##
+## ### Parameters
+## - `node`: Starting `XmlNode` (or null).
+## - `uri`: Namespace URI string ("" for no namespace).
+## - `local`: Local tag name string.
+##
+## ### Returns
+## The matching node array in document order.
+pub function find_ns(node, uri: string, local: string) -> array
+    return find_ns_scoped(node, uri, local, map())
+end
+
+## Scoped worker for `find_ns` carrying the inherited declarations.
+##
+## ### Parameters
+## - `node`: Current `XmlNode` (or null).
+## - `uri`: Namespace URI string.
+## - `local`: Local tag name string.
+## - `scope`: Inherited prefix-to-URI map.
+##
+## ### Returns
+## The matching node array in document order.
+function find_ns_scoped(node, uri: string, local: string, scope) -> array
+    let res = []
+    if node is null
+        return res
+    end
+    let merged = map()
+    let skeys = keys(scope)
+    for sk in skeys
+        merged[sk] = scope[sk]
+    end
+    let decls = ns_scope(node)
+    let dkeys = keys(decls)
+    for dk in dkeys
+        merged[dk] = decls[dk]
+    end
+    let pfx = ns_prefix(node.name)
+    let node_uri = ""
+    if pfx == ""
+        if _map_has(merged, "") == 1
+            node_uri = merged[""]
+        end
+    else
+        if _map_has(merged, pfx) == 1
+            node_uri = merged[pfx]
+        end
+    end
+    if node_uri == uri and local_name(node.name) == local
+        res.push(node)
+    end
+    if node.children is not null
+        for kid in node.children
+            let sub = find_ns_scoped(kid, uri, local, merged)
+            for item in sub
+                res.push(item)
+            end
+        end
+    end
+    return res
 end
 
 # ───────────────────────────────────────────────────────────────

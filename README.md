@@ -19,8 +19,11 @@ A fast, zero-dependency XML 1.0 parser and serializer for the Alya Programming L
   - **CDATA**: `<![CDATA[ ... ]]>` sections kept verbatim.
   - **References**: Predefined entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`) plus decimal (`&#65;`) and hexadecimal (`&#x41;`) character references; unknown entities pass through literally.
   - **Path Navigation**: Dot-separated element queries (`catalog.book.title`), recursive `find_all`, and trimmed text helpers.
+  - **Attribute Order**: Document order preserved on round-trip (`attr_order` tracking, duplicate collapsing).
+  - **Strict Mode**: `check_wellformed` diagnostics with byte offsets plus `parse_strict` / `parse_doc_strict` gates.
+  - **Namespaces**: Prefix/default `xmlns` resolution with scoped `find_ns` lookup (elements only).
 - 🛠️ **Builder API**: Programmatically construct documents (`make_element`, `set_attr`, `add_child`, `set_text`) and serialize compact or pretty-printed.
-- 🧪 **100% Verified**: 135 assertions passing, verified on Windows (Linux/macOS via CI).
+- 🧪 **100% Verified**: 171 assertions passing, verified on Windows (Linux/macOS via CI).
 
 ---
 
@@ -38,7 +41,8 @@ xml/
 │   └── demo.alya           # Comprehensive usage example
 ├── tests/
 │   ├── test_basic.alya     # Full 14-part automated test suite (123 assertions)
-│   └── test_unicode.alya   # Unicode reference regression suite (12 assertions)
+│   ├── test_unicode.alya   # Unicode reference regression suite (12 assertions)
+│   └── test_advanced.alya  # Attribute order, strict validation & namespace suite (36 assertions)
 └── benches/
     └── bench_basic.alya    # Micro-benchmarks for parsing, lookup, and serialization
 ```
@@ -130,6 +134,9 @@ main()
 | `load_file(path)` | Reads a file and parses it into a root node. |
 | `load_doc(path)` | Reads a file into an `XmlDoc`. |
 | `is_valid(text)` | `1` when the text holds a well-formed element, `0` otherwise. |
+| `check_wellformed(text)` | `""` when structurally valid, else a reason with byte offset. |
+| `parse_strict(text)` | Root node, or null unless the input validates. |
+| `parse_doc_strict(text)` | `XmlDoc`, or an empty document unless the input validates. |
 | `get_attr(node, key, default="")` | Attribute value or default (null-safe). |
 | `has_attr(node, key)` | `1` when the attribute exists, `0` otherwise. |
 | `children(node)` | Direct child element array (empty when none). |
@@ -139,6 +146,10 @@ main()
 | `text_of(node, default="")` | Raw text content or default. |
 | `find_path(node, path)` | Dot-separated descent (`"a.b.c"`), first match per level. |
 | `find_all(node, name)` | Recursive descendant collection in document order. |
+| `local_name(qname)` | Local part after the first `:` (or the whole name). |
+| `ns_prefix(qname)` | Prefix before the first `:` (or `""`). |
+| `ns_scope(node)` | Prefix-to-URI map from the node's `xmlns` declarations. |
+| `find_ns(node, uri, local)` | Recursive element search with inherited scope. |
 | `text_at(node, path, default="")` | Trimmed text at a path, or default. |
 | `XmlDoc.find(path)` | `find_path` from the document root. |
 | `XmlDoc.find_all(name)` | `find_all` from the document root. |
