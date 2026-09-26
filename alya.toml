@@ -1,0 +1,32 @@
+[package]
+name = "xml"
+version = "0.1.0"
+alya-version = "0.0.19"
+entry = "src/lib.alya"
+description = "Fast, zero-dependency XML 1.0 parser and serializer for Alya"
+authors = ["Alya Language Contributors <https://github.com/alya-lang>"]
+license = "MIT"
+homepage = "https://github.com/alya-lang/alya"
+repository = "https://github.com/alya-lang/xml"
+keywords = ["alya", "alya-lang", "package", "xml", "parser", "serializer"]
+
+[dependencies]
+
+# [build]
+# c-sources = ["c/source.c"]
+# c-flags = ["-O2"]
+# c-include-dirs = ["c"]
+# links = "xml"
+
+# [lint]
+# disabled_rules = []
+# exclude = []
+
+# [fmt]
+# exclude = []
+
+# [test]
+# exclude = []
+
+# [bench]
+# exclude = []
