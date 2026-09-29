@@ -65,6 +65,22 @@ alya add xml --git https://github.com/alya-lang/xml --branch main
 alya install
 ```
 
+### Package Features
+
+| Feature | Default | Description |
+|:---|:---:|:---|
+| `io` | ✅ | File loading/saving (`load_file`, `load_doc`, `dump_file`). Without it only in-memory parse/serialize remain. |
+
+```bash
+# Full build (default)
+alya install
+alya test
+
+# Slim build without file I/O
+alya install --no-default-features
+alya test --no-default-features
+```
+
 ---
 
 ## 🚀 Quick Start

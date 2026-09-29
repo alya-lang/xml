@@ -12,6 +12,10 @@ keywords = ["alya", "alya-lang", "package", "xml", "parser", "serializer"]
 
 [dependencies]
 
+[features]
+default = ["io"]
+io = []
+
 # [build]
 # c-sources = ["c/source.c"]
 # c-flags = ["-O2"]

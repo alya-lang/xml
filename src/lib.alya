@@ -40,11 +40,14 @@ end
 
 ## Reads an XML file from disk and parses it into a root node.
 ##
+## Requires the `io` feature (default-on).
+##
 ## ### Parameters
 ## - `path`: File path string.
 ##
 ## ### Returns
 ## The root `XmlNode`.
+@cfg(feature = "io")
 pub function load_file(path: string)
     let content = read_file(path)
     return parse_xml(content)
@@ -57,6 +60,7 @@ end
 ##
 ## ### Returns
 ## The parsed `XmlDoc` instance.
+@cfg(feature = "io")
 pub function load_doc(path: string) -> XmlDoc
     let content = read_file(path)
     return parse_xml_doc(content)
@@ -535,9 +539,12 @@ end
 
 ## Writes an XML string directly to a file.
 ##
+## Requires the `io` feature (default-on).
+##
 ## ### Parameters
 ## - `path`: File path string.
 ## - `xml_str`: XML document string.
+@cfg(feature = "io")
 pub function dump_file(path: string, xml_str: string)
     return write_file(path, xml_str)
 end
