@@ -81,7 +81,7 @@ end
 ##
 ## ### Returns
 ## `1` when valid, `0` otherwise.
-pub function is_valid_name(name: string) -> int
+pub function is_valid_name(name: string) -> bool
     if name is null or len(name) == 0
         return false
     end

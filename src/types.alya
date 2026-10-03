@@ -107,7 +107,7 @@ end
 ##
 ## ### Returns
 ## `1` when the character is a space or tab, `0` otherwise.
-pub function is_space(ch: string) -> int
+pub function is_space(ch: string) -> bool
     if ch == " " or ch == "\t"
         return true
     end
@@ -121,7 +121,7 @@ end
 ##
 ## ### Returns
 ## `1` for whitespace, `0` otherwise.
-pub function is_whitespace(ch: string) -> int
+pub function is_whitespace(ch: string) -> bool
     if ch == " " or ch == "\t" or ch == "\r" or ch == "\n"
         return true
     end
@@ -135,7 +135,7 @@ end
 ##
 ## ### Returns
 ## `1` when the character is a digit, `0` otherwise.
-pub function is_digit(ch: string) -> int
+pub function is_digit(ch: string) -> bool
     let c = ord(ch)
     return c >= 48 and c <= 57
 end
@@ -147,7 +147,7 @@ end
 ##
 ## ### Returns
 ## `1` when the character is a hex digit, `0` otherwise.
-pub function is_hex_digit(ch: string) -> int
+pub function is_hex_digit(ch: string) -> bool
     let c = ord(ch)
     return (c >= 48 and c <= 57) or (c >= 97 and c <= 102) or (c >= 65 and c <= 70)
 end
@@ -161,7 +161,7 @@ end
 ##
 ## ### Returns
 ## `1` when the character may start a name, `0` otherwise.
-pub function is_name_start_char(ch: string) -> int
+pub function is_name_start_char(ch: string) -> bool
     let c = ord(ch)
     if (c >= 97 and c <= 122) or (c >= 65 and c <= 90)
         return true
@@ -182,7 +182,7 @@ end
 ##
 ## ### Returns
 ## `1` when the character may appear in a name, `0` otherwise.
-pub function is_name_char(ch: string) -> int
+pub function is_name_char(ch: string) -> bool
     if is_name_start_char(ch) == true
         return true
     end

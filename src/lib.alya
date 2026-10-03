@@ -73,7 +73,7 @@ end
 ##
 ## ### Returns
 ## `1` when an element parses, `0` otherwise.
-pub function is_valid(text: string) -> int
+pub function is_valid(text: string) -> bool
     return parse_xml(text) is not null
 end
 
