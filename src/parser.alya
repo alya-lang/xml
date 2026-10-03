@@ -386,7 +386,7 @@ end
 ## ```alya
 ## let t = unescape("a &amp; b") # "a & b"
 ## ```
-pub function unescape(s: string) -> string
+pub function unescape(s) -> string
     if s is null
         return ""
     end
