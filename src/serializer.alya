@@ -83,20 +83,20 @@ end
 ## `1` when valid, `0` otherwise.
 pub function is_valid_name(name: string) -> int
     if name is null or len(name) == 0
-        return 0
+        return false
     end
-    if is_name_start_char(char_at(name, 0)) == 0
-        return 0
+    if is_name_start_char(char_at(name, 0)) == false
+        return false
     end
     let i = 1
     let n = len(name)
     while i < n
-        if is_name_char(char_at(name, i)) == 0
-            return 0
+        if is_name_char(char_at(name, i)) == false
+            return false
         end
         i += 1
     end
-    return 1
+    return true
 end
 
 ## Renders indentation padding (two spaces per level).
@@ -145,16 +145,16 @@ function render_attrs(node) -> string
     let seen = map()
     if node.attr_order is not null
         for aname in node.attr_order
-            if _map_has(node.attrs, aname) == 1
+            if _map_has(node.attrs, aname) == true
                 let aval = escape_attr(attr_lookup(node, aname))
                 res += " {aname}=\"{aval}\""
-                seen[aname] = 1
+                seen[aname] = true
             end
         end
     end
     let names = keys(node.attrs)
     for aname in names
-        if _map_has(seen, aname) == 0
+        if _map_has(seen, aname) == false
             let aval = escape_attr(attr_lookup(node, aname))
             res += " {aname}=\"{aval}\""
         end
@@ -180,7 +180,7 @@ function render_node(node, pretty: int, level: int) -> string
     let kid_count = len(node.children)
     let has_text = len(node.text)
     if kid_count == 0 and has_text == 0
-        if pretty == 1
+        if pretty == true
             let pad = indent_pad(level)
             return "{pad}<{n}{astr}/>"
         end
@@ -188,13 +188,13 @@ function render_node(node, pretty: int, level: int) -> string
     end
     if kid_count == 0
         let etext = escape_text(node.text)
-        if pretty == 1
+        if pretty == true
             let pad = indent_pad(level)
             return "{pad}<{n}{astr}>{etext}</{n}>"
         end
         return "<{n}{astr}>{etext}</{n}>"
     end
-    if pretty == 1
+    if pretty == true
         let pad = indent_pad(level)
         let res = "{pad}<{n}{astr}>"
         let t = trim(node.text)
@@ -286,7 +286,7 @@ pub function set_attr(node, key: string, val: string)
         node.attrs[key] = val
         return node
     end
-    if _map_has(node.attrs, key) == 0
+    if _map_has(node.attrs, key) == false
         node.attr_order.push(key)
     end
     node.attrs[key] = val

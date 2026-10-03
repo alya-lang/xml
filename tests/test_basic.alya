@@ -50,8 +50,8 @@ function test_decl_and_simple(r)
     runner_assert_str_eq(r, doc3.encoding, "ISO-8859-1", "parse_doc single-quote encoding")
 
     runner_assert(r, xml::is_valid("<a/>"), "is_valid accepts self-closing root")
-    runner_assert(r, xml::is_valid("") == 0, "is_valid rejects empty string")
-    runner_assert(r, xml::is_valid("hello") == 0, "is_valid rejects bare text")
+    runner_assert(r, xml::is_valid("") == false, "is_valid rejects empty string")
+    runner_assert(r, xml::is_valid("hello") == false, "is_valid rejects bare text")
 end
 
 function test_attributes(r)
@@ -59,7 +59,7 @@ function test_attributes(r)
     runner_assert_str_eq(r, xml::get_attr(root, "host"), "127.0.0.1", "double-quoted attribute")
     runner_assert_str_eq(r, xml::get_attr(root, "port"), "8080", "single-quoted attribute")
     runner_assert(r, xml::has_attr(root, "host"), "has_attr true for existing key")
-    runner_assert(r, xml::has_attr(root, "missing") == 0, "has_attr false for missing key")
+    runner_assert(r, xml::has_attr(root, "missing") == false, "has_attr false for missing key")
     runner_assert_str_eq(r, xml::get_attr(root, "missing", "dflt"), "dflt", "get_attr fallback default")
 
     let ent = xml::parse("<a href=\"x?y=1&amp;z=2\">t</a>")
@@ -184,9 +184,9 @@ function test_find(r)
     runner_assert_eq(r, xml::XmlNodeType.Text, 2, "XmlNodeType.Text variant")
     runner_assert(r, xml::is_valid_name("book"), "is_valid_name accepts plain tag")
     runner_assert(r, xml::is_valid_name("a:b-c.d"), "is_valid_name accepts colon dash dot")
-    runner_assert(r, xml::is_valid_name("1bad") == 0, "is_valid_name rejects leading digit")
-    runner_assert(r, xml::is_valid_name("") == 0, "is_valid_name rejects empty string")
-    runner_assert(r, xml::is_valid_name("has space") == 0, "is_valid_name rejects spaces")
+    runner_assert(r, xml::is_valid_name("1bad") == false, "is_valid_name rejects leading digit")
+    runner_assert(r, xml::is_valid_name("") == false, "is_valid_name rejects empty string")
+    runner_assert(r, xml::is_valid_name("has space") == false, "is_valid_name rejects spaces")
 end
 
 function test_serialize(r)
@@ -201,7 +201,7 @@ function test_serialize(r)
     runner_assert_str_eq(r, xml::stringify(esc2), "<a>x &lt; y &amp; \"q\"</a>", "text escaped on serialize")
 
     let pretty = xml::parse("<root><a>x</a><b><c>y</c></b></root>")
-    let pretty_out = xml::stringify(pretty, 1)
+    let pretty_out = xml::stringify(pretty, true)
     runner_assert_str_eq(r, pretty_out, "<root>\n  <a>x</a>\n  <b>\n    <c>y</c>\n  </b>\n</root>", "pretty indent two spaces per level")
 
     runner_assert_str_eq(r, xml::declaration(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>", "default declaration")

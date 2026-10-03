@@ -22,7 +22,7 @@ import "./types.alya"
 ## The first non-whitespace position.
 pub function skip_ws(text: string, pos: int, text_len: int) -> int
     while pos < text_len
-        if is_whitespace(char_at(text, pos)) == 1
+        if is_whitespace(char_at(text, pos)) == true
             pos += 1
         else
             break
@@ -124,7 +124,7 @@ end
 pub function skip_misc(text: string, pos: int, text_len: int) -> int
     while pos < text_len
         let ch = char_at(text, pos)
-        if is_whitespace(ch) == 1
+        if is_whitespace(ch) == true
             pos += 1
         elif ch == "<"
             if pos + 3 < text_len and substring(text, pos, 4) == "<!--"
@@ -155,7 +155,7 @@ end
 pub function parse_name(text: string, pos: int, text_len: int)
     let start = pos
     while pos < text_len
-        if is_name_char(char_at(text, pos)) == 1
+        if is_name_char(char_at(text, pos)) == true
             pos += 1
         else
             break
@@ -280,15 +280,15 @@ pub function parse_entity(text: string, pos: int, text_len: int)
             let digits = substring(ename, 1, elen - 1)
             let di = 0
             let dlen = len(digits)
-            let all_digits = 1
+            let all_digits = true
             while di < dlen
-                if is_digit(char_at(digits, di)) == 0
-                    all_digits = 0
+                if is_digit(char_at(digits, di)) == false
+                    all_digits = false
                     break
                 end
                 di += 1
             end
-            if all_digits == 1 and dlen > 0
+            if all_digits == true and dlen > 0
                 let dcode = to_int(digits)
                 if dcode <= 1114111
                     return chr_utf8(dcode), end_pos
@@ -422,9 +422,9 @@ pub function parse_element(text: string, pos: int, text_len: int)
     pos = epos
     let attrs = map()
     let order = []
-    let self_close = 0
-    let tag_done = 0
-    while pos < text_len and tag_done == 0
+    let self_close = false
+    let tag_done = false
+    while pos < text_len and tag_done == false
         pos = skip_ws(text, pos, text_len)
         if pos >= text_len
             break
@@ -432,16 +432,16 @@ pub function parse_element(text: string, pos: int, text_len: int)
         let tch = char_at(text, pos)
         if tch == ">"
             pos += 1
-            tag_done = 1
+            tag_done = true
         elif tch == "/"
             if pos + 1 < text_len and char_at(text, pos + 1) == ">"
                 pos += 2
-                self_close = 1
-                tag_done = 1
+                self_close = true
+                tag_done = true
             else
                 pos += 1
             end
-        elif is_name_start_char(tch) == 1
+        elif is_name_start_char(tch) == true
             let aname, apos = parse_name(text, pos, text_len)
             pos = skip_ws(text, apos, text_len)
             if pos < text_len and char_at(text, pos) == "="
@@ -449,7 +449,7 @@ pub function parse_element(text: string, pos: int, text_len: int)
                 pos = skip_ws(text, pos, text_len)
                 if pos < text_len and (char_at(text, pos) == "\"" or char_at(text, pos) == "'")
                     let aval, avpos = parse_attr_value(text, pos, text_len)
-                    if _map_has(attrs, aname) == 0
+                    if _map_has(attrs, aname) == false
                         order.push(aname)
                     end
                     attrs[aname] = aval
@@ -458,19 +458,19 @@ pub function parse_element(text: string, pos: int, text_len: int)
                     let bare = ""
                     while pos < text_len
                         let bch = char_at(text, pos)
-                        if is_whitespace(bch) == 1 or bch == ">" or bch == "/"
+                        if is_whitespace(bch) == true or bch == ">" or bch == "/"
                             break
                         end
                         bare += bch
                         pos += 1
                     end
-                    if _map_has(attrs, aname) == 0
+                    if _map_has(attrs, aname) == false
                         order.push(aname)
                     end
                     attrs[aname] = bare
                 end
             else
-                if _map_has(attrs, aname) == 0
+                if _map_has(attrs, aname) == false
                     order.push(aname)
                 end
                 attrs[aname] = ""
@@ -479,7 +479,7 @@ pub function parse_element(text: string, pos: int, text_len: int)
             pos += 1
         end
     end
-    if self_close == 1
+    if self_close == true
         return XmlNode {
             name: ename,
             attrs: attrs,
@@ -624,7 +624,7 @@ pub function parse_xml_doc(text: string) -> XmlDoc
     let encoding = "UTF-8"
     if pos + 5 < text_len and substring(text, pos, 5) == "<?xml"
         let dch = char_at(text, pos + 5)
-        if is_whitespace(dch) == 1 or dch == "?"
+        if is_whitespace(dch) == true or dch == "?"
             let q = pos + 5
             while q < text_len
                 if q + 1 < text_len and substring(text, q, 2) == "?>"
@@ -674,7 +674,7 @@ pub function check_wellformed(text: string) -> string
     let text_len = len(text)
     let pos = skip_misc(text, skip_bom(text, text_len), text_len)
     let stack = []
-    let saw_root = 0
+    let saw_root = false
     while pos < text_len
         let ch = char_at(text, pos)
         if ch == "<"
@@ -685,7 +685,7 @@ pub function check_wellformed(text: string) -> string
                 if len(cname) == 0
                     return "empty close tag at byte {pos}"
                 end
-                if is_name_start_char(char_at(cname, 0)) == 0
+                if is_name_start_char(char_at(cname, 0)) == false
                     return "invalid close tag name {cname} at byte {pos}"
                 end
                 cpos = skip_ws(text, cpos2, text_len)
@@ -716,14 +716,14 @@ pub function check_wellformed(text: string) -> string
                 if len(oname) == 0
                     return "expected element name at byte {pos}"
                 end
-                if is_name_start_char(char_at(oname, 0)) == 0
+                if is_name_start_char(char_at(oname, 0)) == false
                     return "invalid element name {oname} at byte {pos}"
                 end
                 pos = opos2
-                let self_close = 0
-                let tag_done = 0
+                let self_close = false
+                let tag_done = false
                 let wferr = ""
-                while pos < text_len and tag_done == 0
+                while pos < text_len and tag_done == false
                     pos = skip_ws(text, pos, text_len)
                     if pos >= text_len
                         break
@@ -731,17 +731,17 @@ pub function check_wellformed(text: string) -> string
                     let tch = char_at(text, pos)
                     if tch == ">"
                         pos += 1
-                        tag_done = 1
+                        tag_done = true
                     elif tch == "/"
                         if pos + 1 < text_len and char_at(text, pos + 1) == ">"
                             pos += 2
-                            self_close = 1
-                            tag_done = 1
+                            self_close = true
+                            tag_done = true
                         else
                             wferr = "expected > after / at byte {pos}"
-                            tag_done = 1
+                            tag_done = true
                         end
-                    elif is_name_start_char(tch) == 1
+                    elif is_name_start_char(tch) == true
                         let aname, apos = parse_name(text, pos, text_len)
                         pos = skip_ws(text, apos, text_len)
                         if pos < text_len and char_at(text, pos) == "="
@@ -752,30 +752,30 @@ pub function check_wellformed(text: string) -> string
                                 pos = avpos
                             else
                                 wferr = "unquoted attribute value for {aname} at byte {pos}"
-                                tag_done = 1
+                                tag_done = true
                             end
                         else
                             wferr = "expected = after attribute {aname} at byte {pos}"
-                            tag_done = 1
+                            tag_done = true
                         end
                     else
                         wferr = "unexpected character {tch} in tag <{oname}> at byte {pos}"
-                        tag_done = 1
+                        tag_done = true
                     end
                 end
                 if wferr != ""
                     return wferr
                 end
-                if tag_done == 0
+                if tag_done == false
                     return "unterminated tag <{oname}> at byte {pos}"
                 end
                 if len(stack) == 0
-                    if saw_root == 1
+                    if saw_root == true
                         return "multiple root elements at byte {tag_start}"
                     end
-                    saw_root = 1
+                    saw_root = true
                 end
-                if self_close == 0
+                if self_close == false
                     stack.push(oname)
                 end
             end
@@ -787,15 +787,15 @@ pub function check_wellformed(text: string) -> string
             let seg = substring(text, tstart, pos - tstart)
             let si = 0
             let seglen = len(seg)
-            let has_text = 0
+            let has_text = false
             while si < seglen
-                if is_whitespace(char_at(seg, si)) == 0
-                    has_text = 1
+                if is_whitespace(char_at(seg, si)) == false
+                    has_text = true
                     break
                 end
                 si += 1
             end
-            if has_text == 1 and len(stack) == 0
+            if has_text == true and len(stack) == 0
                 return "character content outside root element at byte {tstart}"
             end
         end
@@ -804,7 +804,7 @@ pub function check_wellformed(text: string) -> string
         let open = stack.pop()
         return "unclosed <{open}> at end of input (byte {text_len})"
     end
-    if saw_root == 0
+    if saw_root == false
         return "no root element"
     end
     return ""

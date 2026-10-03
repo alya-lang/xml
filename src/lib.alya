@@ -142,9 +142,9 @@ end
 ## `1` when present, `0` otherwise.
 pub function has_attr(node, key: string) -> int
     if node is null or node.attrs is null
-        return 0
+        return false
     end
-    return key in node.attrs ? 1 : 0
+    return key in node.attrs ? true : false
 end
 
 ## Returns the child element array (empty when none).
@@ -434,11 +434,11 @@ function find_ns_scoped(node, uri: string, local: string, scope) -> array
     let pfx = ns_prefix(node.name)
     let node_uri = ""
     if pfx == ""
-        if _map_has(merged, "") == 1
+        if _map_has(merged, "") == true
             node_uri = merged[""]
         end
     else
-        if _map_has(merged, pfx) == 1
+        if _map_has(merged, pfx) == true
             node_uri = merged[pfx]
         end
     end

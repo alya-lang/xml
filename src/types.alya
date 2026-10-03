@@ -109,9 +109,9 @@ end
 ## `1` when the character is a space or tab, `0` otherwise.
 pub function is_space(ch: string) -> int
     if ch == " " or ch == "\t"
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Checks whether a character is XML whitespace (space, tab, CR, or LF).
@@ -123,9 +123,9 @@ end
 ## `1` for whitespace, `0` otherwise.
 pub function is_whitespace(ch: string) -> int
     if ch == " " or ch == "\t" or ch == "\r" or ch == "\n"
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Checks whether a character is a decimal digit (`0-9`).
@@ -164,12 +164,12 @@ end
 pub function is_name_start_char(ch: string) -> int
     let c = ord(ch)
     if (c >= 97 and c <= 122) or (c >= 65 and c <= 90)
-        return 1
+        return true
     end
     if ch == "_" or ch == ":"
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Checks whether a character may continue an XML name.
@@ -183,14 +183,14 @@ end
 ## ### Returns
 ## `1` when the character may appear in a name, `0` otherwise.
 pub function is_name_char(ch: string) -> int
-    if is_name_start_char(ch) == 1
-        return 1
+    if is_name_start_char(ch) == true
+        return true
     end
     let c = ord(ch)
     if (c >= 48 and c <= 57) or ch == "-" or ch == "."
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Checks whether a map contains a key using native membership.
@@ -203,7 +203,7 @@ end
 ## `1` when the key exists, `0` otherwise.
 pub function _map_has(m, key: string) -> int
     if m is null
-        return 0
+        return false
     end
-    return key in m ? 1 : 0
+    return key in m ? true : false
 end
