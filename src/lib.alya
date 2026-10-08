@@ -189,7 +189,7 @@ pub function children_by_name(node, name: string) -> array
         return res
     end
     for kid in node.children
-        if kid.name == name
+        if kid is not null and kid.name == name
             res.push(kid)
         end
     end
@@ -212,7 +212,7 @@ pub function first_child(node, name: string)
     # from inside a loop yields a stale pointer, so collect then return.
     let found = null
     for kid in node.children
-        if kid.name == name
+        if kid is not null and kid.name == name
             found = kid
             break
         end
@@ -287,15 +287,27 @@ pub function find_all(node, name: string) -> array
     if node is null
         return res
     end
-    if node.name == name
+    if node.name is not null and node.name == name
         res.push(node)
     end
     if node.children is not null
-        for kid in node.children
-            let sub = find_all(kid, name)
-            for item in sub
-                res.push(item)
+        let n = len(node.children)
+        let k = 0
+        while k < n
+            let kid = node.children[k]
+            if kid is not null
+                let sub = find_all(kid, name)
+                let m = len(sub)
+                let j = 0
+                while j < m
+                    let item = sub[j]
+                    if item is not null
+                        res.push(item)
+                    end
+                    j += 1
+                end
             end
+            k += 1
         end
     end
     return res
@@ -312,7 +324,7 @@ end
 ## The trimmed text or the default.
 pub function text_at(node, path_str: string, default_val: string = "") -> string
     let target = find_path(node, path_str)
-    if target is null
+    if target is null or target.text is null
         return default_val
     end
     return trim(target.text)
@@ -446,11 +458,23 @@ function find_ns_scoped(node, uri: string, local: string, scope) -> array
         res.push(node)
     end
     if node.children is not null
-        for kid in node.children
-            let sub = find_ns_scoped(kid, uri, local, merged)
-            for item in sub
-                res.push(item)
+        let n = len(node.children)
+        let k = 0
+        while k < n
+            let kid = node.children[k]
+            if kid is not null
+                let sub = find_ns_scoped(kid, uri, local, merged)
+                let m = len(sub)
+                let j = 0
+                while j < m
+                    let item = sub[j]
+                    if item is not null
+                        res.push(item)
+                    end
+                    j += 1
+                end
             end
+            k += 1
         end
     end
     return res
@@ -469,6 +493,9 @@ end
 ## ### Returns
 ## The resolved node, or null when any segment is missing.
 pub function XmlDoc.find(self: XmlDoc, path_str: string)
+    if self is null or self.root is null
+        return null
+    end
     return find_path(self.root, path_str)
 end
 
@@ -481,6 +508,9 @@ end
 ## ### Returns
 ## The matching node array in document order.
 pub function XmlDoc.find_all(self: XmlDoc, name: string) -> array
+    if self is null or self.root is null
+        return []
+    end
     return find_all(self.root, name)
 end
 

@@ -175,10 +175,15 @@ end
 ## ### Returns
 ## The rendered XML string.
 function render_node(node, pretty: int, level: int) -> string
-    let n = node.name
+    if node is null
+        return ""
+    end
+    let n = node.name is null ? "" : node.name
     let astr = render_attrs(node)
-    let kid_count = len(node.children)
-    let has_text = len(node.text)
+    let kids = node.children is null ? [] : node.children
+    let txt = node.text is null ? "" : node.text
+    let kid_count = len(kids)
+    let has_text = len(txt)
     if kid_count == 0 and has_text == 0
         if pretty == true
             let pad = indent_pad(level)
@@ -187,7 +192,7 @@ function render_node(node, pretty: int, level: int) -> string
         return "<{n}{astr}/>"
     end
     if kid_count == 0
-        let etext = escape_text(node.text)
+        let etext = escape_text(txt)
         if pretty == true
             let pad = indent_pad(level)
             return "{pad}<{n}{astr}>{etext}</{n}>"
@@ -197,23 +202,23 @@ function render_node(node, pretty: int, level: int) -> string
     if pretty == true
         let pad = indent_pad(level)
         let res = "{pad}<{n}{astr}>"
-        let t = trim(node.text)
+        let t = trim(txt)
         if len(t) > 0
             res += escape_text(t)
         end
         let i = 0
         while i < kid_count
-            res += "\n" + render_node(node.children[i], pretty, level + 1)
+            res += "\n" + render_node(kids[i], pretty, level + 1)
             i += 1
         end
         res += "\n{pad}</{n}>"
         return res
     end
     let res = "<{n}{astr}>"
-    res += escape_text(node.text)
+    res += escape_text(txt)
     let k = 0
     while k < kid_count
-        res += render_node(node.children[k], pretty, level + 1)
+        res += render_node(kids[k], pretty, level + 1)
         k += 1
     end
     res += "</{n}>"
