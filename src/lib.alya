@@ -313,6 +313,11 @@ pub function find_all_nodes(node, name: string) -> array
     return res
 end
 
+## Backward-compatible alias (kept for public API).
+pub function find_all(node, name: string) -> array
+    return find_all_nodes(node, name)
+end
+
 ## Returns trimmed text at an element path, or a default when missing.
 ##
 ## ### Parameters
@@ -328,6 +333,11 @@ pub function text_at_path(node, path_str: string, default_val: string = "") -> s
         return default_val
     end
     return trim(target.text)
+end
+
+## Backward-compatible alias (kept for public API).
+pub function text_at(node, path_str: string, default_val: string = "") -> string
+    return text_at_path(node, path_str, default_val)
 end
 
 # ───────────────────────────────────────────────────────────────
