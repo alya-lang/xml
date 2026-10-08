@@ -282,7 +282,7 @@ end
 ##
 ## ### Returns
 ## The matching node array in document order.
-pub function find_all(node, name: string) -> array
+pub function find_all_nodes(node, name: string) -> array
     let res = []
     if node is null
         return res
@@ -296,7 +296,7 @@ pub function find_all(node, name: string) -> array
         while k < n
             let kid = node.children[k]
             if kid is not null
-                let sub = find_all(kid, name)
+                let sub = find_all_nodes(kid, name)
                 let m = len(sub)
                 let j = 0
                 while j < m
@@ -313,6 +313,11 @@ pub function find_all(node, name: string) -> array
     return res
 end
 
+## Backward-compatible alias (kept for public API).
+pub function find_all(node, name: string) -> array
+    return find_all_nodes(node, name)
+end
+
 ## Returns trimmed text at an element path, or a default when missing.
 ##
 ## ### Parameters
@@ -322,12 +327,17 @@ end
 ##
 ## ### Returns
 ## The trimmed text or the default.
-pub function text_at(node, path_str: string, default_val: string = "") -> string
+pub function text_at_path(node, path_str: string, default_val: string = "") -> string
     let target = find_path(node, path_str)
     if target is null or target.text is null
         return default_val
     end
     return trim(target.text)
+end
+
+## Backward-compatible alias (kept for public API).
+pub function text_at(node, path_str: string, default_val: string = "") -> string
+    return text_at_path(node, path_str, default_val)
 end
 
 # ───────────────────────────────────────────────────────────────
@@ -511,7 +521,7 @@ pub function XmlDoc.find_all(self: XmlDoc, name: string) -> array
     if self is null or self.root is null
         return []
     end
-    return find_all(self.root, name)
+    return find_all_nodes(self.root, name)
 end
 
 ## Returns trimmed text at an element path from the root.
@@ -524,7 +534,10 @@ end
 ## ### Returns
 ## The trimmed text or the default.
 pub function XmlDoc.text_at(self: XmlDoc, path_str: string, default_val: string = "") -> string
-    return text_at(self.root, path_str, default_val)
+    if self is null
+        return default_val
+    end
+    return text_at_path(self.root, path_str, default_val)
 end
 
 ## Serializes this document (declaration plus root) to an XML string.
