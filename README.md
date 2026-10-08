@@ -18,7 +18,7 @@ A fast, zero-dependency XML 1.0 parser and serializer for the Alya Programming L
   - **Prolog & Misc**: `<?xml version="..." encoding="..."?>` declarations, UTF-8 BOM tolerance, comments (`<!-- -->`), processing instructions (`<?...?>`), and `DOCTYPE` blocks (including `[...]` internal subsets).
   - **CDATA**: `<![CDATA[ ... ]]>` sections kept verbatim.
   - **References**: Predefined entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`) plus decimal (`&#65;`) and hexadecimal (`&#x41;`) character references; unknown entities pass through literally.
-  - **Path Navigation**: Dot-separated element queries (`catalog.book.title`), recursive `find_all`, and trimmed text helpers.
+  - **Path Navigation**: Dot-separated element queries (`catalog.book.title`), recursive `find_all_nodes`, and trimmed text helpers.
   - **Attribute Order**: Document order preserved on round-trip (`attr_order` tracking, duplicate collapsing).
   - **Strict Mode**: `check_wellformed` diagnostics with byte offsets plus `parse_strict` / `parse_doc_strict` gates.
   - **Namespaces**: Prefix/default `xmlns` resolution with scoped `find_ns` lookup (elements only).
@@ -101,8 +101,8 @@ function main()
 "
     let root = xml::parse(text)
     say xml::get_attr(root, "region")      # "eu-central"
-    say xml::text_at(root, "service.name") # "gateway"
-    say xml::text_at(root, "service.port") # "8080"
+    say xml::text_at_path(root, "service.name") # "gateway"
+    say xml::text_at_path(root, "service.port") # "8080"
 end
 
 main()
@@ -161,15 +161,15 @@ main()
 | `first_child(node, name)` | First matching child, or null. |
 | `text_of(node, default="")` | Raw text content or default. |
 | `find_path(node, path)` | Dot-separated descent (`"a.b.c"`), first match per level. |
-| `find_all(node, name)` | Recursive descendant collection in document order. |
+| `find_all_nodes(node, name)` | Recursive descendant collection in document order. |
 | `local_name(qname)` | Local part after the first `:` (or the whole name). |
 | `ns_prefix(qname)` | Prefix before the first `:` (or `""`). |
 | `ns_scope(node)` | Prefix-to-URI map from the node's `xmlns` declarations. |
 | `find_ns(node, uri, local)` | Recursive element search with inherited scope. |
-| `text_at(node, path, default="")` | Trimmed text at a path, or default. |
+| `text_at_path(node, path, default="")` | Trimmed text at a path, or default. |
 | `XmlDoc.find(path)` | `find_path` from the document root. |
-| `XmlDoc.find_all(name)` | `find_all` from the document root. |
-| `XmlDoc.text_at(path, default="")` | `text_at` from the document root. |
+| `XmlDoc.find_all(name)` | `find_all_nodes` from the document root. |
+| `XmlDoc.text_at(path, default="")` | `text_at_path` from the document root. |
 | `XmlDoc.to_string(pretty=0)` | Serializes the document with declaration. |
 | `stringify(node, pretty=0)` | Serializes a node tree (compact or indented). |
 | `stringify_doc(doc, pretty=0)` | Serializes a document with declaration. |

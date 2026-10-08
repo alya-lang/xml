@@ -49,8 +49,8 @@ function main()
     while i < len(services)
         let svc = services[i]
         let sid = xml::get_attr(svc, "id")
-        let sname = xml::text_at(svc, "name")
-        let sport = xml::text_at(svc, "port")
+        let sname = xml::text_at_path(svc, "name")
+        let sport = xml::text_at_path(svc, "port")
         let stls = xml::get_attr(svc, "tls", "false")
         let tls_label = "plain"
         if stls == "true"

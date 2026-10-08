@@ -37,11 +37,11 @@ function main()
     let j = 0
     while j < 50000
         let region = xml::get_attr(parsed, "region")
-        let first_name = xml::text_at(parsed, "service.name")
-        let first_port = xml::text_at(parsed, "service.port")
+        let first_name = xml::text_at_path(parsed, "service.name")
+        let first_port = xml::text_at_path(parsed, "service.port")
         j += 1
     end
-    bench_stop(runner, "xml::get_attr() & text_at() 50,000 lookups")
+    bench_stop(runner, "xml::get_attr() & text_at_path() 50,000 lookups")
 
     # 3. Serialization Benchmark (20,000 iterations)
     bench_start(runner, 20000)
