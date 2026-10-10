@@ -683,23 +683,23 @@ pub function check_wellformed(text: string) -> string
                 cpos = skip_ws(text, cpos, text_len)
                 let cname, cpos2 = parse_name(text, cpos, text_len)
                 if len(cname) == 0
-                    return "empty close tag at byte {pos}"
+                    return f"empty close tag at byte {pos}"
                 end
                 if is_name_start_char(char_at(cname, 0)) == false
-                    return "invalid close tag name {cname} at byte {pos}"
+                    return f"invalid close tag name {cname} at byte {pos}"
                 end
                 cpos = skip_ws(text, cpos2, text_len)
                 if cpos < text_len and char_at(text, cpos) == ">"
                     cpos += 1
                 else
-                    return "expected > to close </{cname}> at byte {pos}"
+                    return f"expected > to close </{cname}> at byte {pos}"
                 end
                 if len(stack) == 0
-                    return "stray close tag </{cname}> at byte {pos}"
+                    return f"stray close tag </{cname}> at byte {pos}"
                 end
                 let open = stack.pop()
                 if open != cname
-                    return "mismatched close tag </{cname}> for <{open}> at byte {pos}"
+                    return f"mismatched close tag </{cname}> for <{open}> at byte {pos}"
                 end
                 pos = cpos
             elif pos + 3 < text_len and substring(text, pos, 4) == "<!--"
@@ -714,10 +714,10 @@ pub function check_wellformed(text: string) -> string
                 opos = skip_ws(text, opos, text_len)
                 let oname, opos2 = parse_name(text, opos, text_len)
                 if len(oname) == 0
-                    return "expected element name at byte {pos}"
+                    return f"expected element name at byte {pos}"
                 end
                 if is_name_start_char(char_at(oname, 0)) == false
-                    return "invalid element name {oname} at byte {pos}"
+                    return f"invalid element name {oname} at byte {pos}"
                 end
                 pos = opos2
                 let self_close = false
@@ -738,7 +738,7 @@ pub function check_wellformed(text: string) -> string
                             self_close = true
                             tag_done = true
                         else
-                            wferr = "expected > after / at byte {pos}"
+                            wferr = f"expected > after / at byte {pos}"
                             tag_done = true
                         end
                     elif is_name_start_char(tch) == true
@@ -751,15 +751,15 @@ pub function check_wellformed(text: string) -> string
                                 let _, avpos = parse_attr_value(text, pos, text_len)
                                 pos = avpos
                             else
-                                wferr = "unquoted attribute value for {aname} at byte {pos}"
+                                wferr = f"unquoted attribute value for {aname} at byte {pos}"
                                 tag_done = true
                             end
                         else
-                            wferr = "expected = after attribute {aname} at byte {pos}"
+                            wferr = f"expected = after attribute {aname} at byte {pos}"
                             tag_done = true
                         end
                     else
-                        wferr = "unexpected character {tch} in tag <{oname}> at byte {pos}"
+                        wferr = f"unexpected character {tch} in tag <{oname}> at byte {pos}"
                         tag_done = true
                     end
                 end
@@ -767,11 +767,11 @@ pub function check_wellformed(text: string) -> string
                     return wferr
                 end
                 if tag_done == false
-                    return "unterminated tag <{oname}> at byte {pos}"
+                    return f"unterminated tag <{oname}> at byte {pos}"
                 end
                 if len(stack) == 0
                     if saw_root == true
-                        return "multiple root elements at byte {tag_start}"
+                        return f"multiple root elements at byte {tag_start}"
                     end
                     saw_root = true
                 end
@@ -796,13 +796,13 @@ pub function check_wellformed(text: string) -> string
                 si += 1
             end
             if has_text == true and len(stack) == 0
-                return "character content outside root element at byte {tstart}"
+                return f"character content outside root element at byte {tstart}"
             end
         end
     end
     if len(stack) > 0
         let open = stack.pop()
-        return "unclosed <{open}> at end of input (byte {text_len})"
+        return f"unclosed <{open}> at end of input (byte {text_len})"
     end
     if saw_root == false
         return "no root element"

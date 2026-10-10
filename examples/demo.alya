@@ -30,7 +30,7 @@ function main()
     # 2. Parse XML string with declaration metadata
     say "1. Parsing document..."
     let doc = xml::parse_doc(sample_xml)
-    say "✓ Parsed as XML {doc.version} ({doc.encoding})"
+    say f"✓ Parsed as XML {doc.version} ({doc.encoding})"
     say ""
 
     # 3. Attribute and path queries
@@ -38,8 +38,8 @@ function main()
     let region = xml::get_attr(doc.root, "region")
     let first_name = doc.text_at("service.name")
     let first_port = doc.text_at("service.port")
-    say "  • Region: {region}"
-    say "  • First service: {first_name}:{first_port}"
+    say f"  • Region: {region}"
+    say f"  • First service: {first_name}:{first_port}"
     say ""
 
     # 4. Iterating repeated elements
@@ -56,7 +56,7 @@ function main()
         if stls == "true"
             tls_label = "TLS"
         end
-        say "  • [{tls_label}] {sid}: {sname} on port {sport}"
+        say f"  • [{tls_label}] {sid}: {sname} on port {sport}"
         i += 1
     end
     say ""
@@ -64,7 +64,7 @@ function main()
     # 5. CDATA content arrives decoded
     say "4. Reading CDATA note:"
     let note = doc.text_at("service.note")
-    say "  • Note: {note}"
+    say f"  • Note: {note}"
     say ""
 
     # 6. Programmatic document builder
@@ -82,7 +82,7 @@ function main()
     # 7. Round-trip back through the parser
     let back = xml::parse(out_xml)
     let back_host = xml::get_attr(back, "host")
-    say "  • Round-trip host: {back_host}"
+    say f"  • Round-trip host: {back_host}"
     say "✓ Demo completed successfully!"
 end
 

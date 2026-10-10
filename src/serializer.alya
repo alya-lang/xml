@@ -147,7 +147,7 @@ function render_attrs(node) -> string
         for aname in node.attr_order
             if _map_has(node.attrs, aname) == true
                 let aval = escape_attr(attr_lookup(node, aname))
-                res += " {aname}=\"{aval}\""
+                res += f" {aname}=\"{aval}\""
                 seen[aname] = true
             end
         end
@@ -156,7 +156,7 @@ function render_attrs(node) -> string
     for aname in names
         if _map_has(seen, aname) == false
             let aval = escape_attr(attr_lookup(node, aname))
-            res += " {aname}=\"{aval}\""
+            res += f" {aname}=\"{aval}\""
         end
     end
     return res
@@ -187,21 +187,21 @@ function render_node(node, pretty: int, level: int) -> string
     if kid_count == 0 and has_text == 0
         if pretty == true
             let pad = indent_pad(level)
-            return "{pad}<{n}{astr}/>"
+            return f"{pad}<{n}{astr}/>"
         end
-        return "<{n}{astr}/>"
+        return f"<{n}{astr}/>"
     end
     if kid_count == 0
         let etext = escape_text(txt)
         if pretty == true
             let pad = indent_pad(level)
-            return "{pad}<{n}{astr}>{etext}</{n}>"
+            return f"{pad}<{n}{astr}>{etext}</{n}>"
         end
-        return "<{n}{astr}>{etext}</{n}>"
+        return f"<{n}{astr}>{etext}</{n}>"
     end
     if pretty == true
         let pad = indent_pad(level)
-        let res = "{pad}<{n}{astr}>"
+        let res = f"{pad}<{n}{astr}>"
         let t = trim(txt)
         if len(t) > 0
             res += escape_text(t)
@@ -211,17 +211,17 @@ function render_node(node, pretty: int, level: int) -> string
             res += "\n" + render_node(kids[i], pretty, level + 1)
             i += 1
         end
-        res += "\n{pad}</{n}>"
+        res += f"\n{pad}</{n}>"
         return res
     end
-    let res = "<{n}{astr}>"
+    let res = f"<{n}{astr}>"
     res += escape_text(txt)
     let k = 0
     while k < kid_count
         res += render_node(kids[k], pretty, level + 1)
         k += 1
     end
-    res += "</{n}>"
+    res += f"</{n}>"
     return res
 end
 
@@ -253,7 +253,7 @@ end
 ## ### Returns
 ## The `<?xml ... ?>` declaration string.
 pub function declaration(version: string = "1.0", encoding: string = "UTF-8") -> string
-    return "<?xml version=\"{version}\" encoding=\"{encoding}\"?>"
+    return f"<?xml version=\"{version}\" encoding=\"{encoding}\"?>"
 end
 
 ## Serializes a document (declaration plus root) to an XML string.
@@ -270,7 +270,7 @@ pub function doc_to_string(doc: XmlDoc, pretty: int = 0) -> string
         return decl
     end
     let body = render_node(doc.root, pretty, 0)
-    return "{decl}\n{body}"
+    return f"{decl}\n{body}"
 end
 
 # ───────────────────────────────────────────────────────────────
